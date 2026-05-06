@@ -1,0 +1,41 @@
+---
+const { heading, description, items = [], layout = 'narrow' } = Astro.props;
+const wrapperClass = layout === 'full' ? '' : 'max-w-3xl mx-auto';
+---
+
+<section class={`mb-12 ${wrapperClass}`}>
+  {heading && <h2 class="mb-2 text-xl font-semibold">{heading}</h2>}
+  {description && <p class="mb-6 text-theme-muted">{description}</p>}
+
+  <div class="faq-list space-y-2">
+    {items.map((item: { question: string; answer: string }, i: number) => (
+      <details class="faq-item group rounded-lg border border-theme-card-border bg-theme-card">
+        <summary class="flex cursor-pointer items-center justify-between gap-4 px-5 py-4 text-sm font-medium select-none">
+          <span>{item.question}</span>
+          <svg class="faq-chevron h-4 w-4 shrink-0 text-theme-muted transition-transform duration-200 group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+        </summary>
+        <div class="faq-answer px-5 pb-4 text-sm leading-relaxed text-theme-muted">
+          <Fragment set:html={item.answer} />
+        </div>
+      </details>
+    ))}
+  </div>
+</section>
+
+<style>
+  .faq-item summary::-webkit-details-marker,
+  .faq-item summary::marker {
+    display: none;
+    content: '';
+  }
+  .faq-answer :global(a) {
+    color: var(--ps-accent);
+    text-decoration: underline;
+  }
+  .faq-answer :global(p) {
+    margin-bottom: 0.5em;
+  }
+  .faq-answer :global(p:last-child) {
+    margin-bottom: 0;
+  }
+</style>

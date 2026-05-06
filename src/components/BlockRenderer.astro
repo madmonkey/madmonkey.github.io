@@ -1,0 +1,47 @@
+---
+import ProfileBlock from './blocks/ProfileBlock.astro';
+import RecentPostsBlock from './blocks/RecentPostsBlock.astro';
+import GalleriesListBlock from './blocks/GalleriesListBlock.astro';
+import HeroBlock from './blocks/HeroBlock.astro';
+import YouTubeBlock from './blocks/YouTubeBlock.astro';
+import GalleryBlock from './blocks/GalleryBlock.astro';
+import TextBlock from './blocks/TextBlock.astro';
+import ImageBlock from './blocks/ImageBlock.astro';
+import LocationBlock from './blocks/LocationBlock.astro';
+import FaqBlock from './blocks/FaqBlock.astro';
+import CtaBlock from './blocks/CtaBlock.astro';
+import SocialEmbedBlock from './blocks/SocialEmbedBlock.astro';
+
+const { blocks = [] } = Astro.props;
+
+const hasLightbox = blocks.some((b: any) => b.type === 'gallery' || (b.type === 'image' && b.lightbox !== false));
+---
+
+{blocks.map((block: any) => (
+  <>
+    {block.type === 'hero' && <HeroBlock {...block} />}
+    {block.type === 'profile' && <ProfileBlock {...block} />}
+    {block.type === 'recentPosts' && <RecentPostsBlock {...block} />}
+    {block.type === 'youtube' && <YouTubeBlock {...block} />}
+    {block.type === 'gallery' && <GalleryBlock {...block} />}
+    {block.type === 'text' && <TextBlock {...block} />}
+    {block.type === 'image' && <ImageBlock {...block} />}
+    {block.type === 'location' && <LocationBlock {...block} />}
+    {block.type === 'faq' && <FaqBlock {...block} />}
+    {block.type === 'galleriesList' && <GalleriesListBlock {...block} />}
+    {block.type === 'cta' && <CtaBlock {...block} />}
+    {block.type === 'socialEmbed' && <SocialEmbedBlock {...block} />}
+  </>
+))}
+
+{hasLightbox && (
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox/dist/css/glightbox.min.css" />
+  <script is:inline src="https://cdn.jsdelivr.net/npm/glightbox/dist/js/glightbox.min.js"></script>
+  <script is:inline>
+    document.addEventListener('DOMContentLoaded', function() {
+      if (typeof GLightbox !== 'undefined') {
+        GLightbox({ selector: '.glightbox', touchNavigation: true, loop: true });
+      }
+    });
+  </script>
+)}

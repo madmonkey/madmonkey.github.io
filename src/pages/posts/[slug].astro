@@ -1,0 +1,149 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ExifDisplay from '../../components/ExifDisplay.astro';
+import PhotoGallery from '../../components/PhotoGallery.astro';
+import SocialActions from '../../components/SocialActions.astro';
+import { getCollection, render } from 'astro:content';
+import { withBase, cleanSlug } from '../../lib/config';
+import settings from '../../content/settings.json';
+
+const enableSocial = settings.enableSocial !== false;
+const showDates = settings.showDates !== false;
+
+export async function getStaticPaths() {
+  const posts = await getCollection('posts');
+  return posts.map(post => ({ params: { slug: cleanSlug(post.id) }, props: { post } }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+
+// For static sites, we always render both modal and content, let client-side JS handle visibility
+const isPrivate = post.data.visibility === 'private';
+const postSlug = cleanSlug(post.id);
+---
+
+<BaseLayout title={post.data.title} description={post.data.description} image={post.data.image ? withBase(typeof post.data.image === 'string' ? post.data.image : post.data.image.src) : undefined}>
+  {isPrivate && (
+    <div id="private-modal" class="mx-auto max-w-4xl" style="display: none;">
+      <!-- Private post modal -->
+      <div class="min-h-screen flex items-start justify-center pt-20 -mx-4 px-4">
+        <div class="w-full max-w-sm rounded-lg border border-theme-border bg-theme-card p-8 text-center">
+          <svg class="mx-auto mb-4 w-12 h-12 text-theme-muted" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          <h1 class="text-2xl font-bold mb-2">Private Post</h1>
+          <p id="error-msg" class="mb-4 text-sm text-red-500 hidden font-semibold">Incorrect password. Try again.</p>
+          <p class="text-theme-muted mb-6">This post is password protected. Enter the password to view it.</p>
+          <form id="unlock-form" class="space-y-4">
+            <input type="password" id="post-password" placeholder="Enter password" maxlength="6" class="w-full rounded border border-theme-border bg-theme-surface px-3 py-2 text-center text-lg tracking-widest font-mono" />
+            <button type="submit" class="w-full rounded bg-theme-primary text-white px-4 py-2 font-medium hover:bg-theme-primary-hover transition">Unlock</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  )}
+  
+  <article id="post-content" class="mx-auto max-w-4xl" style={isPrivate ? "display: none;" : ""}>
+    <!-- Hero Image -->
+    {post.data.image && (
+      <div class="mb-8 overflow-hidden rounded-lg">
+        <img
+          src={withBase(typeof post.data.image === 'string' ? post.data.image : post.data.image.src)}
+          alt={post.data.imageAlt || post.data.title}
+          class="w-full"
+        />
+      </div>
+    )}
+
+    <!-- Title & Meta -->
+    <header class="mb-8">
+      <h1 class="text-3xl font-bold font-heading">{post.data.title}</h1>
+      <div class="mt-2 flex items-center gap-4 text-sm text-theme-muted">
+        {showDates && (
+          <time datetime={post.data.pubDate.toISOString()}>
+            {post.data.pubDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+          </time>
+        )}
+        {post.data.tags.length > 0 && (
+          <div class="flex gap-1">
+            {post.data.tags.map(tag => (
+              <span class="rounded bg-theme-tag px-2 py-0.5 text-xs">{tag}</span>
+            ))}
+          </div>
+        )}
+      </div>
+    </header>
+
+    <!-- EXIF Data -->
+    {post.data.exif && <ExifDisplay exif={post.data.exif} />}
+
+    <!-- Content -->
+    <div class="prose prose-zinc dark:prose-invert max-w-none">
+      <Content />
+    </div>
+
+    <!-- Gallery -->
+    {post.data.gallery && post.data.gallery.length > 0 && (
+      <PhotoGallery photos={post.data.gallery} />
+    )}
+
+    <!-- Social interactions (client-side) -->
+    {enableSocial && <SocialActions postSlug={postSlug} />}
+  </article>
+
+  {isPrivate && (
+    <script define:vars={{ postId: postSlug, correctPassword: post.data.privatePassword }}>
+      const privateModal = document.getElementById('private-modal');
+      const postContent = document.getElementById('post-content');
+      const form = document.getElementById('unlock-form');
+      const input = document.getElementById('post-password');
+      const errorMsg = document.getElementById('error-msg');
+      
+      // Check if already unlocked on page load
+      function checkUnlocked() {
+        const cookies = document.cookie.split('; ').reduce((acc, cookie) => {
+          const [name, value] = cookie.split('=');
+          acc[name] = value;
+          return acc;
+        }, {});
+        
+        const cookieValue = cookies[`post_${postId}`];
+        const isUnlocked = cookieValue === correctPassword;
+        
+        if (isUnlocked) {
+          privateModal.style.display = 'none';
+          postContent.style.display = '';
+        }
+      }
+      
+      // Check on page load
+      checkUnlocked();
+      
+      if (!correctPassword) {
+        errorMsg.textContent = 'Error: No password configured.';
+        errorMsg.classList.remove('hidden');
+      }
+      
+      input.addEventListener('focus', () => {
+        errorMsg.classList.add('hidden');
+      });
+      
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const password = input.value.trim();
+        const expected = correctPassword ? correctPassword.trim() : '';
+        
+        if (password === expected && password.length > 0) {
+          document.cookie = `post_${postId}=${password}; path=/; max-age=2592000`;
+          
+          // Show content and hide modal
+          privateModal.style.display = 'none';
+          postContent.style.display = '';
+        } else {
+          errorMsg.classList.remove('hidden');
+          input.value = '';
+          input.focus();
+        }
+      });
+    </script>
+  )}
+</BaseLayout>

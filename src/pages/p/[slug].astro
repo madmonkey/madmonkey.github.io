@@ -1,0 +1,33 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import BlockRenderer from '../../components/BlockRenderer.astro';
+
+// Load all page JSON files from the content/pages directory
+const pageFiles = import.meta.glob('../../content/pages/*.json', { eager: true });
+
+// Build pages array, skipping the .gitkeep placeholder
+const pages = Object.entries(pageFiles)
+  .map(([path, mod]: [string, any]) => {
+    const data = mod.default || mod;
+    if (!data.slug) return null;
+    return data;
+  })
+  .filter(Boolean);
+
+export function getStaticPaths() {
+  const pageFiles = import.meta.glob('../../content/pages/*.json', { eager: true });
+  return Object.entries(pageFiles)
+    .map(([path, mod]: [string, any]) => {
+      const data = mod.default || mod;
+      if (!data.slug) return null;
+      return { params: { slug: data.slug }, props: { page: data } };
+    })
+    .filter(Boolean);
+}
+
+const { page } = Astro.props;
+---
+
+<BaseLayout title={page.title} description={page.description}>
+  <BlockRenderer blocks={page.blocks || []} />
+</BaseLayout>

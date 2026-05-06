@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-theme-bg: var(--ps-bg);
+  --color-theme-surface: var(--ps-surface);
+  --color-theme-surface-border: var(--ps-surface-border);
+  --color-theme-surface-hover: var(--ps-surface-hover);
+  --color-theme-text: var(--ps-text);
+  --color-theme-muted: var(--ps-text-muted);
+  --color-theme-faint: var(--ps-text-faint);
+  --color-theme-primary: var(--ps-primary);
+  --color-theme-primary-hover: var(--ps-primary-hover);
+  --color-theme-accent: var(--ps-accent);
+  --color-theme-border: var(--ps-border);
+  --color-theme-input-bg: var(--ps-input-bg);
+  --color-theme-input-border: var(--ps-input-border);
+  --color-theme-tag: var(--ps-tag);
+  --color-theme-tag-text: var(--ps-tag-text);
+  --color-theme-card: var(--ps-card-bg);
+  --color-theme-card-border: var(--ps-card-border);
+  --color-theme-card-hover: var(--ps-card-hover);
+  --color-theme-header: var(--ps-header-bg);
+  --color-theme-footer: var(--ps-footer-bg);
+
+  --font-heading: var(--ps-font-heading);
+  --font-body: var(--ps-font-body);
+  --font-mono: var(--ps-font-mono);
+
+  --font-size-heading-scale: calc(1em * var(--ps-heading-scale, 1));
+  --font-size-body-scale: calc(1em * var(--ps-body-scale, 1));
+}
+
+html {
+  scrollbar-gutter: stable;
+}

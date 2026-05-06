@@ -1,0 +1,54 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getCollection } from 'astro:content';
+import { withBase, cleanSlug } from '../../lib/config';
+import labels from '../../content/labels.json';
+import settings from '../../content/settings.json';
+
+const showDates = settings.showDates !== false;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const posts = (await getCollection('posts'))
+  .filter(p => !p.data.draft && p.data.visibility !== 'private')
+  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+---
+
+<BaseLayout title="Posts">
+  <h1 class="mb-8 text-2xl font-bold">{labels.posts.heading}</h1>
+  <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    {posts.map((post) => (
+      <a
+        href={`${base}/posts/${cleanSlug(post.id)}`}
+        class="group overflow-hidden rounded-lg border border-theme-card-border bg-theme-card transition hover:border-theme-card-hover"
+      >
+        {post.data.image && (
+          <div class="aspect-[4/3] overflow-hidden">
+            <img
+              src={withBase(typeof post.data.image === 'string' ? post.data.image : post.data.image.src)}
+              alt={post.data.imageAlt || post.data.title}
+              class="h-full w-full object-cover transition group-hover:scale-105"
+              loading="lazy"
+            />
+          </div>
+        )}
+        <div class="p-4">
+          <h3 class="font-medium">{post.data.title}</h3>
+          {post.data.description && (
+            <p class="mt-1 text-sm text-theme-muted line-clamp-2">{post.data.description}</p>
+          )}
+          {showDates && (
+            <time class="mt-2 block text-xs text-theme-faint" datetime={post.data.pubDate.toISOString()}>
+              {post.data.pubDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+            </time>
+          )}
+          {post.data.tags.length > 0 && (
+            <div class="mt-2 flex flex-wrap gap-1">
+              {post.data.tags.map(tag => (
+                <span class="rounded bg-theme-tag px-2 py-0.5 text-xs text-theme-tag-text">{tag}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      </a>
+    ))}
+  </div>
+</BaseLayout>

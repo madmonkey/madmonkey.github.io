@@ -1,0 +1,79 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Slideshow from '../../components/Slideshow.astro';
+import { getCollection, render } from 'astro:content';
+import labels from '../../content/labels.json';
+import settings from '../../content/settings.json';
+import { cleanSlug } from '../../lib/config';
+
+const showDates = settings.showDates !== false;
+
+export async function getStaticPaths() {
+  const galleries = (await getCollection('galleries')).filter((g: CollectionEntry<'galleries'>) => !g.data?.draft);
+  return galleries.map((g: CollectionEntry<'galleries'>) => ({ params: { slug: cleanSlug(g.id) }, props: { gallery: g } }));
+}
+
+type Props = { gallery: CollectionEntry<'galleries'> };
+
+const { gallery } = Astro.props;
+const { Content } = await render(gallery);
+
+// Merge quickPhotos (flat strings) + photos (objects with alt/caption)
+const allPhotos = [
+  ...(gallery.data.photos ?? []),
+  ...(gallery.data.quickPhotos ?? []).map((src: string) => ({ src, alt: '', caption: '' })),
+];
+---
+
+<BaseLayout title={gallery.data.title} description={gallery.data.description}>
+  <article class="mx-auto max-w-5xl">
+    <header class="mb-8">
+      <h1 class="text-3xl font-bold font-heading">{gallery.data.title}</h1>
+      {gallery.data.description && (
+        <p class="mt-2 text-theme-muted">{gallery.data.description}</p>
+      )}
+      <p class="mt-1 text-sm text-theme-faint">
+        {allPhotos.length} photos
+        {showDates && (
+          <Fragment>
+            &middot;
+            <time datetime={gallery.data.pubDate.toISOString()}>
+              {gallery.data.pubDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+            </time>
+          </Fragment>
+        )}
+      </p>
+    </header>
+
+    <!-- Slideshow -->
+    <Slideshow
+      photos={allPhotos}
+      transition={gallery.data.slideshowStyle}
+      interval={gallery.data.slideshowInterval}
+    />
+
+    <!-- Text content -->
+    <div class="prose prose-zinc dark:prose-invert mt-8 max-w-none">
+      <Content />
+    </div>
+
+    <!-- Grid view -->
+    <h2 class="mt-12 mb-6 text-xl font-semibold">{labels.galleries.allPhotos}</h2>
+    <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+      {allPhotos.map((photo, i) => (
+        <button
+          class="group aspect-square overflow-hidden rounded cursor-pointer slideshow-jump"
+          data-index={i}
+        >
+          <img
+            src={typeof photo.src === 'string' ? photo.src : photo.src.src}
+            alt={photo.alt || `Photo ${i + 1}`}
+            class="h-full w-full object-cover transition group-hover:scale-110"
+            loading="lazy"
+          />
+        </button>
+      ))}
+    </div>
+  </article>
+</BaseLayout>

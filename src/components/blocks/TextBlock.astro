@@ -1,0 +1,51 @@
+---
+import { marked } from 'marked';
+
+const { heading, body = '', layout = 'narrow' } = Astro.props;
+
+const html = marked.parse(body) as string;
+const wrapperClass = layout === 'full' ? '' : 'max-w-3xl mx-auto';
+---
+
+<section class={`mb-12 ${wrapperClass}`}>
+  {heading && <h2 class="mb-4 text-xl font-semibold">{heading}</h2>}
+  <div class="block-prose" set:html={html} />
+</section>
+
+<style>
+  .block-prose :global(h1),
+  .block-prose :global(h2),
+  .block-prose :global(h3) {
+    font-weight: bold;
+    margin-top: 1.2em;
+    margin-bottom: 0.5em;
+  }
+  .block-prose :global(h1) { font-size: 1.75em; }
+  .block-prose :global(h2) { font-size: 1.4em; }
+  .block-prose :global(h3) { font-size: 1.15em; }
+  .block-prose :global(p) { margin-bottom: 1em; line-height: 1.7; }
+  .block-prose :global(ul),
+  .block-prose :global(ol) { margin-left: 1.5em; margin-bottom: 1em; }
+  .block-prose :global(li) { margin-bottom: 0.25em; }
+  .block-prose :global(a) { color: var(--ps-accent); text-decoration: underline; }
+  .block-prose :global(blockquote) {
+    border-left: 3px solid var(--ps-accent);
+    padding-left: 1em;
+    margin: 1em 0;
+    color: var(--ps-muted);
+  }
+  .block-prose :global(img) { max-width: 100%; border-radius: 0.5rem; }
+  .block-prose :global(code) {
+    background: var(--ps-card);
+    padding: 0.15em 0.35em;
+    border-radius: 0.25em;
+    font-size: 0.9em;
+  }
+  .block-prose :global(pre) {
+    background: var(--ps-card);
+    padding: 1em;
+    border-radius: 0.5em;
+    overflow-x: auto;
+    margin-bottom: 1em;
+  }
+</style>

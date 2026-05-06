@@ -1,0 +1,39 @@
+---
+import { withBase } from '../../lib/config';
+import CtaLinks from './CtaLinks.astro';
+
+const { heading, subheading, image, overlay = true, height = 'medium', links = [] } = Astro.props;
+
+const heightClass = {
+  small: 'min-h-[40vh]',
+  medium: 'min-h-[60vh]',
+  large: 'min-h-[80vh]',
+  full: 'min-h-screen',
+}[height] || 'min-h-[60vh]';
+---
+
+<section class={`relative flex items-center justify-center ${heightClass} mb-12 overflow-hidden rounded-lg`}>
+  {image && (
+    <img
+      src={withBase(image)}
+      alt={heading || ''}
+      class="absolute inset-0 h-full w-full object-cover"
+    />
+  )}
+  {image && overlay && (
+    <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"></div>
+  )}
+  <div class="relative z-10 text-center px-6">
+    {heading && (
+      <h1 class={`text-4xl md:text-6xl font-bold font-heading ${image ? 'text-white' : ''}`}>{heading}</h1>
+    )}
+    {subheading && (
+      <p class={`mt-4 text-lg md:text-xl max-w-2xl ${image ? 'text-white/90' : 'text-theme-muted'}`}>{subheading}</p>
+    )}
+    {links.length > 0 && (
+      <div class="mt-6">
+        <CtaLinks links={links} align="center" onDark={!!image} />
+      </div>
+    )}
+  </div>
+</section>

@@ -1,0 +1,168 @@
+name: Deploy Core (Reusable)
+
+on:
+  workflow_call:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout user repo
+        uses: actions/checkout@v6
+        with:
+          path: user-repo
+
+      - name: Fetch latest template
+        uses: actions/checkout@v6
+        with:
+          repository: piratewebsite/piratesocial
+          path: template-source
+
+      - name: Merge template + user content
+        run: |
+          # Start with fresh template code (files now at root, not in node-template/)
+          cp -r template-source build
+          
+          # Remove .git and node_modules from build
+          rm -rf build/.git build/node_modules build/.astro build/dist
+          
+          # Overlay user content — everything lives in src/content/
+          # This includes: posts, galleries, settings, theme, pwa, home, pages
+          # labels.json is merged (not overwritten) so new template keys are preserved
+          if [ -d user-repo/src/content ]; then
+            # Save template labels before user content overlay
+            cp build/src/content/labels.json /tmp/template-labels.json 2>/dev/null || true
+            rm -rf build/src/content
+            cp -r user-repo/src/content build/src/content
+            # Merge labels: template base + user overrides (preserves new template keys)
+            if [ -f /tmp/template-labels.json ]; then
+              node -e "
+                const fs = require('fs');
+                const t = JSON.parse(fs.readFileSync('/tmp/template-labels.json','utf8'));
+                const uPath = 'build/src/content/labels.json';
+                const u = fs.existsSync(uPath) ? JSON.parse(fs.readFileSync(uPath,'utf8')) : {};
+                const merge = (a,b) => { const r={...a}; for(const k in b){ r[k] = typeof a[k]==='object'&&!Array.isArray(a[k])&&typeof b[k]==='object'&&!Array.isArray(b[k]) ? merge(a[k],b[k]) : b[k]; } return r; };
+                fs.writeFileSync(uPath, JSON.stringify(merge(t,u),null,2));
+              "
+            fi
+          fi
+          
+          # Legacy support: migrate old src/data/ files if they exist
+          if [ -f user-repo/src/data/settings.json ]; then
+            cp user-repo/src/data/settings.json build/src/content/settings.json
+          fi
+          for f in theme.json pwa.json home.json; do
+            if [ -f "user-repo/src/data/$f" ]; then
+              cp "user-repo/src/data/$f" "build/src/content/$f"
+            fi
+          done
+          # Merge labels.json: template is base, user overrides on top (preserves new template keys)
+          if [ -f "user-repo/src/data/labels.json" ]; then
+            node -e "
+              const t = JSON.parse(require('fs').readFileSync('build/src/content/labels.json','utf8'));
+              const u = JSON.parse(require('fs').readFileSync('user-repo/src/data/labels.json','utf8'));
+              const merge = (a,b) => { const r={...a}; for(const k in b){ r[k] = typeof a[k]==='object'&&!Array.isArray(a[k])&&typeof b[k]==='object'&&!Array.isArray(b[k]) ? merge(a[k],b[k]) : b[k]; } return r; };
+              require('fs').writeFileSync('build/src/content/labels.json', JSON.stringify(merge(t,u),null,2));
+            "
+          fi
+          if [ -d user-repo/src/data/pages ]; then
+            mkdir -p build/src/content/pages
+            cp -r user-repo/src/data/pages/. build/src/content/pages/
+          fi
+          
+          # User images (site-wide assets like icons, logos)
+          if [ -d user-repo/public/images ]; then
+            cp -r user-repo/public/images/. build/public/images/
+          fi
+          
+          # User content settings (not admin CMS config — that comes from template)
+          if [ -f user-repo/src/content/settings.json ]; then
+            cp user-repo/src/content/settings.json build/src/content/settings.json
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Detect site URL
+        id: site-config
+        run: |
+          REPO_NAME="${{ github.event.repository.name }}"
+          OWNER="${{ github.repository_owner }}"
+          # Check for custom domain (CNAME file in user repo)
+          CUSTOM_DOMAIN=""
+          if [ -f user-repo/CNAME ]; then
+            CUSTOM_DOMAIN=$(cat user-repo/CNAME | tr -d '[:space:]')
+          fi
+          if [ -n "$CUSTOM_DOMAIN" ]; then
+            echo "site_url=https://${CUSTOM_DOMAIN}" >> "$GITHUB_OUTPUT"
+            echo "base_path=" >> "$GITHUB_OUTPUT"
+          elif [[ "$REPO_NAME" == *.github.io ]]; then
+            echo "site_url=https://${REPO_NAME}" >> "$GITHUB_OUTPUT"
+            echo "base_path=" >> "$GITHUB_OUTPUT"
+          else
+            echo "site_url=https://${OWNER}.github.io" >> "$GITHUB_OUTPUT"
+            echo "base_path=/${REPO_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure admin CMS
+        run: |
+          FULL_SITE="${{ steps.site-config.outputs.site_url }}${{ steps.site-config.outputs.base_path }}"
+          # Inject repo and site URL into the template's admin CMS config
+          sed -i "s|repo: your-username/your-repo|repo: ${{ github.repository }}|g" build/public/admin/config.yml
+          sed -i "s|site_url: https://example.com|site_url: ${FULL_SITE}|g" build/public/admin/config.yml
+          sed -i "s|display_url: https://example.com|display_url: ${FULL_SITE}|g" build/public/admin/config.yml
+          # Remove legacy /public/config.yml — admin config lives at /admin/config.yml
+          rm -f build/public/config.yml
+          # Inject Cloudinary media_library if user has enabled it in settings
+          node -e "
+            const fs = require('fs');
+            const settings = JSON.parse(fs.readFileSync('build/src/content/settings.json', 'utf8'));
+            const cl = settings.cloudinary;
+            if (!cl?.enabled || !cl.cloudName || !cl.apiKey) {
+              console.log('Cloudinary not configured, using local media library');
+              process.exit(0);
+            }
+            let yaml = fs.readFileSync('build/public/admin/config.yml', 'utf8');
+            const block = [
+              'media_library:',
+              '  name: cloudinary',
+              '  config:',
+              '    cloud_name: ' + cl.cloudName,
+              '    api_key: ' + cl.apiKey,
+              ''
+            ].join('\n');
+            yaml = yaml.replace(/(logo_url:[^\n]*\n)/, '\$1\n' + block);
+            fs.writeFileSync('build/public/admin/config.yml', yaml);
+            console.log('Cloudinary media library injected: ' + cl.cloudName);
+          "
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: build
+
+      - name: Build site
+        run: npm run build
+        working-directory: build
+        env:
+          SITE_URL: ${{ steps.site-config.outputs.site_url }}
+          BASE_PATH: ${{ steps.site-config.outputs.base_path }}
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: build/dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+
+      - name: Register installation
+        if: success()
+        continue-on-error: true
+        run: |
+          SITE_URL="${{ steps.site-config.outputs.site_url }}${{ steps.site-config.outputs.base_path }}"
+          curl -s -X POST https://piratesocial.app/api/setup/register-install \
+            -H "Content-Type: application/json" \
+            -d "{\"repo\":\"${{ github.repository }}\",\"siteUrl\":\"${SITE_URL}\"}"

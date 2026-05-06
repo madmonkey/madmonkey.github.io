@@ -1,0 +1,146 @@
+---
+import { withBase } from '../lib/config';
+
+interface Photo {
+  src: ImageMetadata | string;
+  alt?: string;
+  caption?: string;
+  credit?: string;
+}
+
+interface Props {
+  photos: Photo[];
+  transition?: 'fade' | 'slide' | 'zoom' | 'kenburns';
+  interval?: number;
+  autoplay?: boolean;
+  showCaptions?: boolean;
+}
+
+const {
+  photos,
+  transition = 'fade',
+  interval = 5,
+  autoplay = false,
+  showCaptions = true,
+} = Astro.props;
+
+const photoData = photos.map(p => ({
+  src: withBase(typeof p.src === 'string' ? p.src : p.src.src),
+  alt: p.alt || '',
+  caption: p.caption || '',
+  credit: p.credit || '',
+}));
+---
+
+<div class="slideshow relative aspect-[16/9] overflow-hidden rounded-lg bg-theme-surface" data-transition={transition} data-interval={interval} data-autoplay={autoplay}>
+  <!-- Slides -->
+  {photoData.map((photo, i) => (
+    <div
+      class={`slide absolute inset-0 transition-all duration-700 ${i === 0 ? 'opacity-100' : 'opacity-0'}`}
+      data-index={i}
+    >
+      <img
+        src={photo.src}
+        alt={photo.alt}
+        class="h-full w-full object-contain bg-black"
+        loading={i === 0 ? 'eager' : 'lazy'}
+      />
+      {showCaptions && (photo.caption || photo.credit) && (
+        <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+          {photo.caption && <p class="text-sm text-white">{photo.caption}</p>}
+          {photo.credit && <p class="text-xs text-theme-muted mt-1">📷 {photo.credit}</p>}
+        </div>
+      )}
+    </div>
+  ))}
+
+  <!-- Controls -->
+  <div class="absolute inset-x-0 bottom-0 flex items-center justify-between p-4 z-10">
+    <div class="flex gap-2">
+      <button class="ss-prev rounded-full bg-black/50 p-2 text-white hover:bg-black/70 transition cursor-pointer">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      </button>
+      <button class="ss-next rounded-full bg-black/50 p-2 text-white hover:bg-black/70 transition cursor-pointer">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+    <div class="flex items-center gap-3">
+      <button class="ss-play rounded-full bg-black/50 p-2 text-white hover:bg-black/70 transition cursor-pointer">
+        <svg class="h-5 w-5 play-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>
+        <svg class="h-5 w-5 pause-icon hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/></svg>
+      </button>
+      <span class="ss-counter text-xs text-white/70">1 / {photoData.length}</span>
+    </div>
+  </div>
+
+  <!-- Progress dots -->
+  <div class="absolute bottom-16 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+    {photoData.map((_, i) => (
+      <button
+        class={`ss-dot h-2 w-2 rounded-full transition cursor-pointer ${i === 0 ? 'bg-white' : 'bg-white/40'}`}
+        data-index={i}
+      />
+    ))}
+  </div>
+</div>
+
+<script is:inline>
+  document.querySelectorAll('.slideshow').forEach(ss => {
+    const slides = ss.querySelectorAll('.slide');
+    const dots = ss.querySelectorAll('.ss-dot');
+    const counter = ss.querySelector('.ss-counter');
+    const total = slides.length;
+    let current = 0;
+    let timer = null;
+    let playing = ss.dataset.autoplay === 'true';
+    const interval = (parseInt(ss.dataset.interval) || 5) * 1000;
+
+    function goTo(i) {
+      slides[current].classList.remove('opacity-100');
+      slides[current].classList.add('opacity-0');
+      dots[current]?.classList.replace('bg-white', 'bg-white/40');
+
+      current = ((i % total) + total) % total;
+
+      slides[current].classList.remove('opacity-0');
+      slides[current].classList.add('opacity-100');
+      dots[current]?.classList.replace('bg-white/40', 'bg-white');
+      counter.textContent = `${current + 1} / ${total}`;
+    }
+
+    function play() {
+      playing = true;
+      ss.querySelector('.play-icon').classList.add('hidden');
+      ss.querySelector('.pause-icon').classList.remove('hidden');
+      timer = setInterval(() => goTo(current + 1), interval);
+    }
+
+    function pause() {
+      playing = false;
+      ss.querySelector('.play-icon').classList.remove('hidden');
+      ss.querySelector('.pause-icon').classList.add('hidden');
+      clearInterval(timer);
+    }
+
+    ss.querySelector('.ss-prev').addEventListener('click', () => { pause(); goTo(current - 1); });
+    ss.querySelector('.ss-next').addEventListener('click', () => { pause(); goTo(current + 1); });
+    ss.querySelector('.ss-play').addEventListener('click', () => playing ? pause() : play());
+    dots.forEach(dot => {
+      dot.addEventListener('click', () => { pause(); goTo(parseInt(dot.dataset.index)); });
+    });
+
+    // Keyboard support for focused slideshows
+    ss.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') goTo(current - 1);
+      if (e.key === 'ArrowRight') goTo(current + 1);
+      if (e.key === ' ') { e.preventDefault(); playing ? pause() : play(); }
+    });
+
+    // External jump (from gallery grid)
+    document.querySelectorAll('.slideshow-jump').forEach(btn => {
+      btn.addEventListener('click', () => { goTo(parseInt(btn.dataset.index)); ss.scrollIntoView({ behavior: 'smooth' }); });
+    });
+
+    if (playing) play();
+  });
+</script>

@@ -1,0 +1,68 @@
+---
+interface Props {
+  exif: {
+    camera?: string;
+    lens?: string;
+    focalLength?: string;
+    aperture?: string;
+    shutterSpeed?: string;
+    iso?: string;
+    dateTaken?: string;
+  };
+}
+
+const { exif } = Astro.props;
+const hasData = Object.values(exif).some(v => v);
+import labels from '../content/labels.json';
+const cl = labels.components;
+---
+
+{hasData && (
+  <div class="my-6 rounded-lg border border-theme-card-border bg-theme-card p-4">
+    <h3 class="mb-3 text-sm font-semibold text-theme-muted uppercase tracking-wider">{cl.exifData}</h3>
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 text-sm">
+      {exif.camera && (
+        <div>
+          <span class="text-theme-faint">{cl.camera}</span>
+          <p class="text-theme-text">{exif.camera}</p>
+        </div>
+      )}
+      {exif.lens && (
+        <div>
+          <span class="text-theme-faint">{cl.lens}</span>
+          <p class="text-theme-text">{exif.lens}</p>
+        </div>
+      )}
+      {exif.focalLength && (
+        <div>
+          <span class="text-theme-faint">{cl.focalLength}</span>
+          <p class="text-theme-text">{exif.focalLength}</p>
+        </div>
+      )}
+      {exif.aperture && (
+        <div>
+          <span class="text-theme-faint">{cl.aperture}</span>
+          <p class="text-theme-text">f/{exif.aperture}</p>
+        </div>
+      )}
+      {exif.shutterSpeed && (
+        <div>
+          <span class="text-theme-faint">{cl.shutterSpeed}</span>
+          <p class="text-theme-text">{exif.shutterSpeed}</p>
+        </div>
+      )}
+      {exif.iso && (
+        <div>
+          <span class="text-theme-faint">{cl.iso}</span>
+          <p class="text-theme-text">{exif.iso}</p>
+        </div>
+      )}
+      {exif.dateTaken && (
+        <div>
+          <span class="text-theme-faint">{cl.dateTaken}</span>
+          <p class="text-theme-text">{exif.dateTaken}</p>
+        </div>
+      )}
+    </div>
+  </div>
+)}

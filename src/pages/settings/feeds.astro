@@ -1,0 +1,584 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { siteConfig } from '../../lib/config';
+import labels from '../../content/labels.json';
+import settings from '../../content/settings.json';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const navStyle = (settings as any).navStyle || 'top';
+const tabBarTop = navStyle === 'float' ? 'top-0' : 'top-[41px] md:top-[57px]';
+---
+
+<BaseLayout title="RSS Feeds">
+  <div class="mx-auto max-w-2xl">
+    <div class={`sticky ${tabBarTop} z-30 -mx-4 px-3 py-2 md:px-4 md:py-4 bg-theme-bg/95 backdrop-blur supports-[backdrop-filter]:bg-theme-bg/80 border-b border-theme-border mb-4 md:mb-6`}>
+      <h1 class="text-lg md:text-2xl font-bold mb-2">{labels.feeds.heading}</h1>
+
+      <div id="auth-required" class="hidden text-center py-4 text-theme-faint">
+        <p>Sign in to manage your RSS subscriptions</p>
+        <a href={`${base}/social/`} class="mt-2 inline-block rounded bg-theme-primary text-white px-4 py-2 text-sm font-medium hover:bg-theme-primary-hover transition">
+          {labels.settings.signInButton}
+        </a>
+      </div>
+
+      <div id="feeds-controls" class="hidden">
+        <form id="add-feed-form" class="flex gap-2 mb-2">
+          <input type="text" id="feed-url-input" placeholder="https://example.com/feed.xml or @handle.bsky.social" required
+            class="flex-1 rounded bg-theme-input-bg border border-theme-input-border px-2 py-1.5 text-sm focus:outline-none focus:border-theme-primary" />
+          <button type="submit" id="add-feed-btn" class="rounded bg-theme-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-theme-primary-hover transition whitespace-nowrap">
+            {labels.feeds.addFeed}
+          </button>
+        </form>
+        <div id="add-error" class="hidden text-red-400 text-sm mb-2"></div>
+        <div class="flex gap-2">
+          <button id="view-feeds" class="rounded bg-theme-surface-hover px-2 py-1 text-xs md:px-3 md:py-1.5 md:text-sm transition active-view">
+            {labels.feeds.tabMyFeeds}
+          </button>
+          <button id="view-posts" class="rounded bg-theme-input-bg px-2 py-1 text-xs md:px-3 md:py-1.5 md:text-sm hover:bg-theme-surface-hover transition">
+            {labels.feeds.tabAllPosts}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="feeds-app" class="hidden">
+
+      <!-- Feeds list -->
+      <div id="feeds-list" class="space-y-3"></div>
+
+      <!-- Posts list (hidden by default) -->
+      <div id="posts-list" class="hidden space-y-4"></div>
+
+      <!-- Feed detail view (hidden by default) -->
+      <div id="feed-detail" class="hidden">
+        <button id="back-to-feeds" class="text-sm text-theme-muted hover:text-theme-text mb-4 flex items-center gap-1 transition">
+          {labels.feeds.backToFeeds}
+        </button>
+        <div id="feed-detail-header" class="mb-6"></div>
+        <div id="feed-detail-posts" class="space-y-4"></div>
+      </div>
+
+      <!-- Loading / empty states -->
+      <div id="loading" class="text-center py-8 text-theme-faint hidden">{labels.social.loading}</div>
+      <div id="empty" class="text-center py-8 text-theme-faint hidden">{labels.feeds.noFeeds}</div>
+
+      <!-- Load more -->
+      <div id="load-more-container" class="mt-8 text-center hidden">
+        <button id="load-more" class="rounded bg-theme-input-bg px-6 py-2 text-sm hover:bg-theme-surface-hover transition">
+          {labels.feeds.loadMore}
+        </button>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<script is:inline src="https://cdn.jsdelivr.net/npm/hls.js@latest/dist/hls.min.js"></script>
+<script is:inline define:vars={{ hubUrl: siteConfig.hubUrl, FL: labels.feeds }} data-astro-rerun>
+  const token = localStorage.getItem(`ps_token:${window.__PS_BASE || '/'}`);
+
+  if (!token) {
+    document.getElementById('auth-required').classList.remove('hidden');
+  } else {
+    document.getElementById('feeds-controls').classList.remove('hidden');
+    document.getElementById('feeds-app').classList.remove('hidden');
+    loadFeeds();
+  }
+
+  let currentView = 'feeds'; // 'feeds', 'posts', 'detail'
+  let currentFeedId = null;
+  let currentPage = 1;
+
+  // --- View switching ---
+  document.getElementById('view-feeds').addEventListener('click', () => {
+    switchView('feeds');
+  });
+  document.getElementById('view-posts').addEventListener('click', () => {
+    switchView('posts');
+  });
+  document.getElementById('back-to-feeds').addEventListener('click', () => {
+    switchView('feeds');
+  });
+
+  function switchView(view) {
+    currentView = view;
+    currentPage = 1;
+
+    document.getElementById('feeds-list').classList.toggle('hidden', view !== 'feeds');
+    document.getElementById('posts-list').classList.toggle('hidden', view !== 'posts');
+    document.getElementById('feed-detail').classList.toggle('hidden', view !== 'detail');
+    document.getElementById('load-more-container').classList.add('hidden');
+
+    document.getElementById('view-feeds').classList.toggle('bg-theme-primary', view === 'feeds');
+    document.getElementById('view-feeds').classList.toggle('bg-theme-surface', view !== 'feeds');
+    document.getElementById('view-posts').classList.toggle('bg-theme-primary', view === 'posts');
+    document.getElementById('view-posts').classList.toggle('bg-theme-surface', view !== 'posts');
+
+    if (view === 'feeds') loadFeeds();
+    if (view === 'posts') loadAllPosts();
+  }
+
+  // --- Add feed ---
+  function resolveInput(raw) {
+    // Bluesky handle: @user.bsky.social or user.bsky.social or user.custom.domain
+    const stripped = raw.replace(/^@/, '');
+    // If it looks like a domain handle (has dots, no slashes, no ://)
+    if (/^[\w.-]+\.\w{2,}$/.test(stripped) && !stripped.includes('/')) {
+      return `https://bsky.app/profile/${stripped}/rss`;
+    }
+    return raw;
+  }
+
+  document.getElementById('add-feed-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('feed-url-input');
+    const errorEl = document.getElementById('add-error');
+    const btn = document.getElementById('add-feed-btn');
+    const feedUrl = resolveInput(input.value.trim());
+
+    errorEl.classList.add('hidden');
+    btn.disabled = true;
+    btn.textContent = FL.adding;
+
+    try {
+      const res = await fetch(`${hubUrl}/api/external-feeds`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feedUrl }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        errorEl.textContent = data.error || 'Failed to add feed';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      input.value = '';
+      switchView('feeds');
+    } catch (err) {
+      errorEl.textContent = 'Network error';
+      errorEl.classList.remove('hidden');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Add Feed';
+    }
+  });
+
+  // --- Load feeds list ---
+  async function loadFeeds() {
+    const container = document.getElementById('feeds-list');
+    const loading = document.getElementById('loading');
+    const empty = document.getElementById('empty');
+
+    loading.classList.remove('hidden');
+    empty.classList.add('hidden');
+    container.innerHTML = '';
+
+    try {
+      const res = await fetch(`${hubUrl}/api/external-feeds`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      const feeds = data.feeds || [];
+
+      loading.classList.add('hidden');
+
+      if (feeds.length === 0) {
+        empty.classList.remove('hidden');
+        return;
+      }
+
+      container.innerHTML = feeds.map(feed => `
+        <div class="rounded-lg border border-theme-card-border bg-theme-card p-4">
+          <div class="flex items-start gap-3">
+            ${feed.iconUrl
+              ? `<img src="${esc(feed.iconUrl)}" class="h-8 w-8 rounded mt-0.5" onerror="this.style.display='none'" />`
+              : `<div class="h-8 w-8 rounded bg-theme-surface-hover flex items-center justify-center text-theme-muted text-xs mt-0.5">RSS</div>`
+            }
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <h3 class="font-medium text-sm truncate">${esc(feed.title || feed.feedUrl)}</h3>
+                ${feed.active
+                  ? '<span class="text-xs px-1.5 py-0.5 rounded-full bg-green-900 text-green-300">Active</span>'
+                  : '<span class="text-xs px-1.5 py-0.5 rounded-full bg-theme-surface-hover text-theme-muted">Paused</span>'
+                }
+              </div>
+              ${feed.siteUrl ? `<a href="${esc(feed.siteUrl)}" target="_blank" class="text-xs text-theme-faint hover:text-theme-text truncate block">${esc(feed.siteUrl)}</a>` : ''}
+              <div class="text-xs text-theme-faint mt-1">
+                ${feed._count?.posts || 0} posts
+                ${feed.lastFetched ? ` · Updated ${timeAgo(feed.lastFetched)}` : ''}
+                ${feed.errorCount > 0 ? ` · <span class="text-yellow-400">${feed.errorCount} errors</span>` : ''}
+              </div>
+              <div class="flex items-center gap-2 mt-2">
+                <label class="text-xs text-theme-faint">Max posts:</label>
+                <select class="max-posts-select rounded bg-theme-surface border border-theme-border px-2 py-0.5 text-xs" data-feed-id="${feed.id}" data-current="${feed.maxPosts || 20}">
+                  ${[5, 10, 20, 50, 100].map(n => `<option value="${n}" ${(feed.maxPosts || 20) === n ? 'selected' : ''}>${n}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+            <div class="flex gap-1.5 shrink-0">
+              <button class="view-feed-btn rounded bg-theme-surface-hover px-2.5 py-1 text-xs hover:bg-theme-primary transition" data-feed-id="${feed.id}" title="View posts">
+                View
+              </button>
+              <button class="refresh-feed-btn rounded bg-theme-surface-hover px-2.5 py-1 text-xs hover:bg-theme-primary transition" data-feed-id="${feed.id}" title="Refresh">
+                ↻
+              </button>
+              <button class="toggle-feed-btn rounded px-2.5 py-1 text-xs transition ${feed.active ? 'bg-yellow-800 hover:bg-yellow-700' : 'bg-green-800 hover:bg-green-700'}" data-feed-id="${feed.id}" data-active="${feed.active}" title="${feed.active ? 'Pause' : 'Resume'}">
+                ${feed.active ? '⏸' : '▶'}
+              </button>
+              <button class="delete-feed-btn rounded bg-red-900 px-2.5 py-1 text-xs hover:bg-red-800 transition" data-feed-id="${feed.id}" title="Remove">
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+
+      attachFeedListeners();
+    } catch (err) {
+      loading.classList.add('hidden');
+      container.innerHTML = '<div class="text-center py-8 text-red-400">Failed to load feeds</div>';
+    }
+  }
+
+  // --- Load all external posts (merged from all feeds) ---
+  async function loadAllPosts(append) {
+    const container = document.getElementById('posts-list');
+    const loading = document.getElementById('loading');
+
+    if (!append) {
+      loading.classList.remove('hidden');
+      container.innerHTML = '';
+    }
+
+    try {
+      const res = await fetch(`${hubUrl}/api/timeline?source=external&page=${currentPage}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      loading.classList.add('hidden');
+
+      const html = renderPostCards(data.posts || []);
+
+      if (append) {
+        container.insertAdjacentHTML('beforeend', html);
+      } else {
+        container.innerHTML = html || `<div class="text-center py-8 text-theme-faint">${FL.noFeeds}</div>`;
+      }
+
+      document.getElementById('load-more-container').classList.toggle('hidden', !data.hasMore);
+      attachShareListeners();
+    } catch (err) {
+      loading.classList.add('hidden');
+      container.innerHTML = '<div class="text-center py-8 text-red-400">Failed to load posts</div>';
+    }
+  }
+
+  // --- Load posts for a specific feed ---
+  async function loadFeedDetail(feedId, append) {
+    const header = document.getElementById('feed-detail-header');
+    const container = document.getElementById('feed-detail-posts');
+    const loading = document.getElementById('loading');
+
+    if (!append) {
+      loading.classList.remove('hidden');
+      container.innerHTML = '';
+    }
+
+    try {
+      const res = await fetch(`${hubUrl}/api/external-feeds/${feedId}/posts?page=${currentPage}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      loading.classList.add('hidden');
+
+      if (!append && data.feed) {
+        header.innerHTML = `
+          <div class="flex items-center gap-3">
+            ${data.feed.iconUrl
+              ? `<img src="${esc(data.feed.iconUrl)}" class="h-10 w-10 rounded" onerror="this.style.display='none'" />`
+              : ''
+            }
+            <div>
+              <h2 class="text-lg font-semibold">${esc(data.feed.title || data.feed.feedUrl)}</h2>
+              ${data.feed.siteUrl ? `<a href="${esc(data.feed.siteUrl)}" target="_blank" class="text-sm text-theme-muted hover:text-theme-text">${esc(data.feed.siteUrl)}</a>` : ''}
+            </div>
+            <span class="text-sm text-theme-faint ml-auto">${data.total} posts</span>
+          </div>
+        `;
+      }
+
+      // If no posts and never fetched before, auto-trigger a refresh
+      if (!append && (data.posts || []).length === 0 && !data.feed?.lastFetched) {
+        container.innerHTML = `<div class="text-center py-8 text-theme-faint">Fetching posts for the first time…</div>`;
+        try {
+          await fetch(`${hubUrl}/api/external-feeds/${feedId}/refresh`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        } catch {}
+        loadFeedDetail(feedId);
+        return;
+      }
+
+      const html = renderPostCards(data.posts || []);
+
+      if (append) {
+        container.insertAdjacentHTML('beforeend', html);
+      } else {
+        container.innerHTML = html || `<div class="text-center py-8 text-theme-faint">${FL.noFeeds}</div>`;
+      }
+
+      document.getElementById('load-more-container').classList.toggle('hidden', !data.hasMore);
+      attachShareListeners();
+    } catch (err) {
+      loading.classList.add('hidden');
+      container.innerHTML = '<div class="text-center py-8 text-red-400">Failed to load posts</div>';
+    }
+  }
+
+  // --- Render post cards ---
+  function renderPostCards(posts) {
+    return posts.map(post => {
+      const embed = post.embedData || {};
+      let embedHtml = '';
+
+      // Multiple images (gallery grid)
+      if (embed.images?.length > 1) {
+        embedHtml += `<div class="grid grid-cols-2 gap-1 mt-2 rounded overflow-hidden">
+          ${embed.images.map(img => `<img src="${esc(img.fullsize || img.thumb)}" alt="${esc(img.alt || '')}" class="w-full object-cover aspect-square" loading="lazy" onerror="this.style.display='none'" />`).join('')}
+        </div>`;
+      }
+
+      // Video
+      if (embed.video?.playlist) {
+        embedHtml += `<div class="mt-2 rounded overflow-hidden bg-black aspect-video">
+          <video controls preload="none" poster="${esc(embed.video.thumb || '')}" class="w-full h-full" data-hls="${esc(embed.video.playlist)}"></video>
+        </div>`;
+      }
+
+      // External link card
+      if (embed.external?.uri) {
+        const ytId = getYouTubeId(embed.external.uri);
+        if (ytId) {
+          embedHtml += `<div class="mt-2 rounded overflow-hidden bg-black aspect-video"><iframe src="https://www.youtube-nocookie.com/embed/${ytId}" class="w-full h-full" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`;
+        } else {
+          let extHost = '';
+          try { extHost = new URL(embed.external.uri).hostname; } catch {}
+          embedHtml += `<a href="${esc(embed.external.uri)}" target="_blank" rel="noopener noreferrer" class="mt-2 block rounded border border-theme-border overflow-hidden hover:border-theme-border transition">
+            ${embed.external.thumb ? `<img src="${esc(embed.external.thumb)}" alt="" class="w-full aspect-[2/1] object-cover" loading="lazy" onerror="this.style.display='none'" />` : ''}
+            <div class="p-3">
+              <div class="text-sm font-medium text-theme-text line-clamp-1">${esc(embed.external.title || '')}</div>
+              ${embed.external.description ? `<div class="text-xs text-theme-faint mt-1 line-clamp-2">${esc(embed.external.description)}</div>` : ''}
+              <div class="text-xs text-theme-faint mt-1">${esc(extHost)}</div>
+            </div>
+          </a>`;
+        }
+      }
+
+      // Quote post
+      if (embed.quote?.text) {
+        embedHtml += `<div class="mt-2 rounded border border-theme-border p-3 bg-theme-surface">
+          <div class="text-xs text-theme-muted mb-1">
+            <span class="font-medium text-theme-text">${esc(embed.quote.author || '')}</span>
+            <span class="text-theme-faint ml-1">@${esc(embed.quote.handle || '')}</span>
+          </div>
+          <p class="text-sm text-theme-text line-clamp-4">${esc(embed.quote.text)}</p>
+        </div>`;
+      }
+
+      // Primary image: single embed image or fallback to imageUrl
+      const primaryImage = (embed.images?.length === 1)
+        ? embed.images[0].fullsize || embed.images[0].thumb
+        : (!embed.images?.length ? post.imageUrl : null);
+
+      return `
+      <article class="rounded-lg border border-theme-card-border bg-theme-card overflow-hidden">
+        ${primaryImage ? `<div class="bg-black flex justify-center"><img src="${esc(primaryImage)}" alt="${esc(embed.images?.[0]?.alt || post.title)}" style="width:100%;max-height:28rem;object-fit:contain" loading="lazy" onerror="this.parentElement.style.display='none'" /></div>` : ''}
+        <div class="p-4">
+          <div class="flex items-center gap-2 mb-2">
+            ${post.feed?.iconUrl
+              ? `<img src="${esc(post.feed.iconUrl)}" class="h-5 w-5 rounded" onerror="this.style.display='none'" />`
+              : ''
+            }
+            <span class="text-xs text-theme-faint">${esc(post.feed?.title || post.author || '')}</span>
+            <span class="text-xs px-1.5 py-0.5 rounded bg-theme-surface text-theme-muted">RSS</span>
+            <time class="text-xs text-theme-faint ml-auto">${new Date(post.pubDate).toLocaleDateString()}</time>
+          </div>
+          ${!embed.external?.uri ? `<h3 class="font-semibold">
+            <a href="${esc(post.link)}" target="_blank" rel="noopener noreferrer" class="hover:underline">${formatText(post.title)}</a>
+          </h3>` : ''}
+          ${post.description && post.description !== post.title && !embed.external?.uri ? `<p class="mt-1 text-sm text-theme-muted">${formatText(post.description)}</p>` : ''}
+          ${embedHtml}
+          ${post.tags?.length ? `<div class="mt-2 flex flex-wrap gap-1">${post.tags.map(t => `<span class="text-xs bg-theme-surface text-theme-muted px-1.5 py-0.5 rounded">${esc(t)}</span>`).join('')}</div>` : ''}
+          <div class="mt-3 flex items-center gap-4 text-sm text-theme-muted">
+            <a href="${esc(post.link)}" target="_blank" rel="noopener noreferrer" class="hover:text-white">↗ Read</a>
+            <button class="share-btn hover:text-green-400 transition" data-url="${esc(post.link)}" data-title="${esc(post.title)}">↗ Share</button>
+          </div>
+        </div>
+      </article>`
+    }).join('');
+  }
+
+  // --- Share modal ---
+  const shareOverlay = document.createElement('div');
+  shareOverlay.id = 'share-modal-overlay';
+  shareOverlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;justify-content:center;align-items:center';
+  shareOverlay.innerHTML = `
+    <div id="share-modal" style="background:#18181b;border:1px solid #3f3f46;border-radius:.75rem;padding:1.5rem;width:20rem;max-width:90vw">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <h3 style="font-weight:600;font-size:1rem">Share</h3>
+        <button id="share-close" style="color:#a1a1aa;font-size:1.25rem;cursor:pointer;background:none;border:none">✕</button>
+      </div>
+      <div id="share-links" style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem"></div>
+    </div>`;
+  document.body.appendChild(shareOverlay);
+
+  shareOverlay.addEventListener('click', (e) => { if (e.target === shareOverlay) shareOverlay.style.display = 'none'; });
+  document.getElementById('share-close').addEventListener('click', () => shareOverlay.style.display = 'none');
+
+  function openShareModal(url, title) {
+    const enc = encodeURIComponent;
+    const links = [
+      { label: '𝕏 Twitter', href: `https://twitter.com/intent/tweet?text=${enc(title)}&url=${enc(url)}` },
+      { label: '📘 Facebook', href: `https://www.facebook.com/sharer/sharer.php?u=${enc(url)}` },
+      { label: '💼 LinkedIn', href: `https://www.linkedin.com/sharing/share-offsite/?url=${enc(url)}` },
+      { label: '📌 Pinterest', href: `https://pinterest.com/pin/create/button/?url=${enc(url)}&description=${enc(title)}` },
+      { label: '🔗 Reddit', href: `https://www.reddit.com/submit?url=${enc(url)}&title=${enc(title)}` },
+      { label: '📧 Email', href: `mailto:?subject=${enc(title)}&body=${enc(url)}` },
+    ];
+    const linksHtml = links.map(l =>
+      `<a href="${l.href}" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;border-radius:.5rem;background:#27272a;color:#e4e4e7;font-size:.875rem;text-decoration:none;transition:background .15s" onmouseover="this.style.background='#3f3f46'" onmouseout="this.style.background='#27272a'">${l.label}</a>`
+    ).join('');
+    const copyBtn = `<button id="share-copy" style="display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;border-radius:.5rem;background:#27272a;color:#e4e4e7;font-size:.875rem;border:none;cursor:pointer;transition:background .15s;grid-column:span 2" onmouseover="this.style.background='#3f3f46'" onmouseout="this.style.background='#27272a'">📋 Copy Link</button>`;
+    document.getElementById('share-links').innerHTML = linksHtml + copyBtn;
+    document.getElementById('share-copy').addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(url);
+        document.getElementById('share-copy').textContent = '✓ Copied!';
+        setTimeout(() => document.getElementById('share-copy').textContent = '📋 Copy Link', 2000);
+      } catch { /* fallback */ }
+    });
+    shareOverlay.style.display = 'flex';
+  }
+
+  function attachShareListeners() {
+    document.querySelectorAll('.share-btn').forEach(btn => {
+      btn.addEventListener('click', () => openShareModal(btn.dataset.url, btn.dataset.title));
+    });
+  }
+
+  // --- Feed action listeners ---
+  function attachFeedListeners() {
+    document.querySelectorAll('.view-feed-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentFeedId = btn.dataset.feedId;
+        currentPage = 1;
+        switchView('detail');
+        loadFeedDetail(currentFeedId);
+      });
+    });
+
+    document.querySelectorAll('.refresh-feed-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        btn.textContent = '...';
+        btn.disabled = true;
+        try {
+          const res = await fetch(`${hubUrl}/api/external-feeds/${btn.dataset.feedId}/refresh`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Refresh failed');
+          btn.textContent = `+${data.newPosts ?? 0}`;
+          setTimeout(() => { btn.textContent = '↻'; btn.disabled = false; loadFeeds(); }, 1500);
+        } catch {
+          btn.textContent = '!';
+          setTimeout(() => { btn.textContent = '↻'; btn.disabled = false; }, 1500);
+        }
+      });
+    });
+
+    document.querySelectorAll('.toggle-feed-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const active = btn.dataset.active === 'true';
+        await fetch(`${hubUrl}/api/external-feeds/${btn.dataset.feedId}`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ active: !active }),
+        });
+        loadFeeds();
+      });
+    });
+
+    document.querySelectorAll('.delete-feed-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Remove this feed and all its posts?')) return;
+        await fetch(`${hubUrl}/api/external-feeds/${btn.dataset.feedId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        loadFeeds();
+      });
+    });
+
+    document.querySelectorAll('.max-posts-select').forEach(sel => {
+      sel.addEventListener('change', async () => {
+        const maxPosts = parseInt(sel.value, 10);
+        await fetch(`${hubUrl}/api/external-feeds/${sel.dataset.feedId}`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ maxPosts }),
+        });
+        loadFeeds();
+      });
+    });
+  }
+
+  // --- Load more ---
+  document.getElementById('load-more').addEventListener('click', () => {
+    currentPage++;
+    if (currentView === 'posts') loadAllPosts(true);
+    if (currentView === 'detail') loadFeedDetail(currentFeedId, true);
+  });
+
+  // --- Helpers ---
+  function getYouTubeId(url) {
+    if (!url) return null;
+    const m = url.match(/(?:(?:www\.|m\.|music\.)?youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/|live\/|v\/)|youtu\.be\/)([\w-]{11})/);
+    return m ? m[1] : null;
+  }
+
+  function esc(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function formatText(str) {
+    if (!str) return '';
+    let text = str
+      .replace(/&#xA;/gi, '\n')
+      .replace(/\[contains quote post or other embedded content\]/gi, '')
+      .trim();
+    return esc(text).replace(/\n/g, '<br>');
+  }
+
+  function timeAgo(dateStr) {
+    const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  }
+</script>
+
+<style>
+  .active-view {
+    background-color: rgb(82 82 91);
+  }
+</style>

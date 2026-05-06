@@ -1,0 +1,19 @@
+---
+const { heading = 'Location', address, mapUrl } = Astro.props;
+---
+
+<section class="mb-12">
+  {heading && <h2 class="mb-4 text-xl font-semibold">{heading}</h2>}
+  {address && <p class="mb-4 text-theme-muted whitespace-pre-line">{address}</p>}
+  {mapUrl && (
+    <div class="overflow-hidden rounded-lg" style="aspect-ratio: 16/9;">
+      <iframe
+        src={mapUrl}
+        class="h-full w-full border-0"
+        allowfullscreen
+        loading="lazy"
+        referrerpolicy="no-referrer-when-downgrade"
+      ></iframe>
+    </div>
+  )}
+</section>

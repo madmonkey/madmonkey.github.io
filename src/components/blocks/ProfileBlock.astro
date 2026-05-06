@@ -1,0 +1,32 @@
+---
+import { siteConfig } from '../../lib/config';
+
+const { layout = 'center' } = Astro.props;
+
+const sectionClass = {
+  center: 'flex flex-col items-center text-center',
+  row: 'flex flex-col items-center text-center md:flex-row md:text-left md:gap-8',
+  card: 'mx-auto max-w-md rounded-lg border border-theme-card-border bg-theme-card p-6 text-center',
+}[layout] || 'flex flex-col items-center text-center';
+
+const imgSize = layout === 'card' ? 'h-24 w-24' : 'h-32 w-32';
+const headingSize = layout === 'card' ? 'text-2xl' : 'text-3xl';
+---
+
+<section class={`mb-12 ${sectionClass}`}>
+  <img
+    src={siteConfig.avatar}
+    alt={siteConfig.author}
+    class={`${imgSize} rounded-full border-2 border-theme-border object-cover ${layout === 'card' ? 'mx-auto' : ''}`}
+  />
+  <div class={layout === 'row' ? 'mt-4 md:mt-0' : 'mt-4'}>
+    <h1 class={`${headingSize} font-bold font-heading`}>{siteConfig.author}</h1>
+    <p class="mt-2 max-w-lg text-theme-muted">{siteConfig.bio}</p>
+    {siteConfig.camera && (
+      <p class="mt-1 text-sm text-theme-faint">📷 {siteConfig.camera}</p>
+    )}
+    {siteConfig.location && (
+      <p class="mt-1 text-sm text-theme-faint">📍 {siteConfig.location}</p>
+    )}
+  </div>
+</section>

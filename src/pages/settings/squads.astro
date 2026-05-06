@@ -1,0 +1,464 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { siteConfig } from '../../lib/config';
+import labels from '../../content/labels.json';
+const sq = labels.squads;
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<BaseLayout title="Squads">
+  <div class="mx-auto max-w-2xl">
+    <h1 class="text-2xl font-bold mb-2">{sq.heading}</h1>
+    <p class="text-theme-muted text-sm mb-8">
+      Create groups of Bluesky users. See who's active at a glance and browse their posts.
+    </p>
+
+    <div id="auth-required" class="hidden text-center py-12 text-theme-faint">
+      <p>{sq.signInPrompt}</p>
+      <a href={`${base}/social/`} class="mt-4 inline-block rounded bg-white text-black px-4 py-2 text-sm font-medium hover:bg-theme-surface-hover transition">
+        {labels.settings.signInButton}
+      </a>
+    </div>
+
+    <div id="squads-app" class="hidden">
+      <!-- Create squad -->
+      <form id="create-squad-form" class="flex gap-2 mb-8">
+        <input type="text" id="squad-name-input" placeholder={sq.placeholder} required
+          class="flex-1 rounded bg-theme-surface border border-theme-border px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+        <button type="submit" class="rounded bg-blue-600 px-4 py-2 text-sm font-medium hover:bg-blue-500 transition whitespace-nowrap">
+          {sq.createButton}
+        </button>
+      </form>
+
+      <!-- Squads list -->
+      <div id="squads-list" class="space-y-8"></div>
+    </div>
+  </div>
+</BaseLayout>
+
+<script is:inline define:vars={{ hubUrl: siteConfig.hubUrl, SQ: labels.squads }} data-astro-rerun>
+  const token = localStorage.getItem(`ps_token:${window.__PS_BASE || '/'}`);
+
+  let myAvatar = null;
+  let myHandle = null;
+
+  if (!token) {
+    document.getElementById('auth-required').classList.remove('hidden');
+  } else {
+    document.getElementById('squads-app').classList.remove('hidden');
+    // Fetch user's Bluesky profile for center avatar
+    (async () => {
+      try {
+        const bskyRes = await fetch(`${hubUrl}/api/bluesky/status`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const bskyData = await bskyRes.json();
+        myHandle = bskyData.handle;
+
+        // Get avatar from Bluesky profile
+        if (myHandle) {
+          const profileRes = await fetch(`https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor=${encodeURIComponent(myHandle)}`);
+          if (profileRes.ok) {
+            const profile = await profileRes.json();
+            myAvatar = profile.avatar || null;
+          }
+        }
+      } catch {}
+      loadSquads();
+    })();
+  }
+
+  // --- Create squad ---
+  document.getElementById('create-squad-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('squad-name-input');
+    const name = input.value.trim();
+    if (!name) return;
+
+    try {
+      const res = await fetch(`${hubUrl}/api/bluesky-feed/squads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) { const d = await res.json(); alert(d.error); return; }
+      input.value = '';
+      loadSquads();
+    } catch { alert('Failed to create squad'); }
+  });
+
+  // --- Load squads ---
+  async function loadSquads() {
+    const container = document.getElementById('squads-list');
+    try {
+      const res = await fetch(`${hubUrl}/api/bluesky-feed/squads`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const squads = await res.json();
+
+      if (!squads.length) {
+        container.innerHTML = '<div class="text-center py-8 text-theme-faint">No squads yet. Create one above!</div>';
+        return;
+      }
+
+      container.innerHTML = squads.map(squad => renderSquad(squad)).join('');
+
+      // Attach listeners
+      attachSquadListeners();
+
+      // Check activity for each squad
+      squads.forEach(squad => checkActivity(squad.id));
+    } catch {
+      container.innerHTML = '<div class="text-center py-8 text-red-400">Failed to load squads</div>';
+    }
+  }
+
+  function renderSquad(squad) {
+    const windowLabel = formatWindow(squad.activityWindow);
+    return `
+    <div class="rounded-lg border border-theme-card-border bg-theme-card p-6" data-squad-id="${squad.id}">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold">${esc(squad.name)}</h2>
+        <div class="flex items-center gap-2">
+          <button class="delete-squad-btn text-xs text-red-400 hover:text-red-300 transition" data-squad-id="${squad.id}">${SQ.deleteButton}</button>
+        </div>
+      </div>
+
+      <!-- Activity window slider -->
+      <div class="mb-4 flex items-center gap-3">
+        <label class="text-xs text-theme-faint whitespace-nowrap">Activity window:</label>
+        <input type="range" min="15" max="720" step="15" value="${squad.activityWindow}"
+          class="flex-1 accent-blue-500 squad-window-slider" data-squad-id="${squad.id}" />
+        <span class="text-xs text-theme-muted w-16 text-right squad-window-label" data-squad-id="${squad.id}">${windowLabel}</span>
+      </div>
+
+      <!-- Circle avatar layout -->
+      <div class="squad-circle relative flex justify-center items-center my-6" style="min-height:16rem">
+        <!-- Center: logged-in user avatar -->
+        <div class="absolute rounded-full border-2 border-blue-500 overflow-hidden bg-theme-surface flex items-center justify-center" style="width:4rem;height:4rem;z-index:2">
+          ${myAvatar
+            ? `<img src="${esc(myAvatar)}" alt="You" class="w-full h-full object-cover" />`
+            : `<span class="text-lg">👤</span>`
+          }
+        </div>
+        <!-- Member avatars will be positioned around -->
+        ${squad.members.map((m, i) => {
+          const count = squad.members.length;
+          const angle = (2 * Math.PI * i / count) - Math.PI / 2;
+          const radius = 100;
+          const x = Math.cos(angle) * radius;
+          const y = Math.sin(angle) * radius;
+          return `
+          <div class="absolute squad-member-avatar" data-member-id="${m.id}" data-handle="${esc(m.handle)}"
+            style="transform:translate(${x}px,${y}px);z-index:1">
+            <div class="relative group cursor-pointer">
+              <div class="activity-dot absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-theme-card bg-theme-primary z-10" data-member-id="${m.id}"></div>
+              ${m.avatarUrl
+                ? `<img src="${esc(m.avatarUrl)}" alt="${esc(m.displayName || m.handle)}" class="w-12 h-12 rounded-full border-2 border-theme-border hover:border-theme-border transition" />`
+                : `<div class="w-12 h-12 rounded-full border-2 border-theme-border bg-theme-surface flex items-center justify-center text-theme-muted text-xs">${esc((m.handle || '?')[0].toUpperCase())}</div>`
+              }
+              <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-theme-faint whitespace-nowrap opacity-0 group-hover:opacity-100 transition pointer-events-none">
+                ${esc(m.displayName || m.handle)}
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <!-- View feed button -->
+      ${squad.members.length ? `
+      <button class="view-squad-feed-btn mt-4 w-full rounded bg-theme-surface py-2 text-sm hover:bg-theme-surface-hover transition" data-squad-id="${squad.id}">
+        ${SQ.viewFeed}
+      </button>
+      <div class="squad-feed hidden mt-4 space-y-4" data-squad-id="${squad.id}"></div>
+      ` : ''}
+
+      <!-- Add member -->
+      <div class="flex gap-2 mt-4">
+        <input type="text" placeholder="@handle.bsky.social" class="add-member-input flex-1 rounded bg-theme-surface border border-theme-border px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500" data-squad-id="${squad.id}" />
+        <button class="add-member-btn rounded bg-theme-surface-hover px-3 py-1.5 text-sm hover:bg-theme-primary transition" data-squad-id="${squad.id}">Add</button>
+      </div>
+
+      <!-- Member list (collapsible, collapsed by default) -->
+      <div class="mt-3">
+        <button class="toggle-members-btn text-xs text-theme-faint hover:text-theme-muted transition flex items-center gap-1" data-squad-id="${squad.id}">
+          <span class="toggle-members-arrow" data-squad-id="${squad.id}">▶</span>
+          ${squad.members.length} member${squad.members.length !== 1 ? 's' : ''}
+        </button>
+        <div class="members-list hidden mt-2 flex flex-wrap gap-1" data-squad-id="${squad.id}">
+          ${squad.members.map(m => `
+            <span class="inline-flex items-center gap-1 rounded bg-theme-surface px-2 py-0.5 text-xs text-theme-muted">
+              @${esc(m.handle)}
+              <button class="remove-member-btn text-theme-faint hover:text-red-400 transition" data-squad-id="${squad.id}" data-member-id="${m.id}">✕</button>
+            </span>
+          `).join('')}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // --- Activity check ---
+  async function checkActivity(squadId) {
+    try {
+      const res = await fetch(`${hubUrl}/api/bluesky-feed/squads/${squadId}/activity`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+
+      data.members.forEach(m => {
+        const dot = document.querySelector(`.activity-dot[data-member-id="${m.id}"]`);
+        if (dot) {
+          if (m.isActive) {
+            dot.classList.remove('bg-theme-primary');
+            dot.classList.add('bg-green-500');
+            dot.title = `Last posted ${timeAgo(m.lastPostAt)}`;
+          } else {
+            dot.classList.remove('bg-green-500');
+            dot.classList.add('bg-theme-primary');
+            dot.title = m.lastPostAt ? `Last posted ${timeAgo(m.lastPostAt)}` : 'No recent posts';
+          }
+        }
+      });
+    } catch {}
+  }
+
+  // --- Squad listeners ---
+  function attachSquadListeners() {
+    // Activity window slider
+    document.querySelectorAll('.squad-window-slider').forEach(slider => {
+      slider.addEventListener('input', () => {
+        const label = document.querySelector(`.squad-window-label[data-squad-id="${slider.dataset.squadId}"]`);
+        if (label) label.textContent = formatWindow(parseInt(slider.value));
+      });
+      slider.addEventListener('change', async () => {
+        await fetch(`${hubUrl}/api/bluesky-feed/squads/${slider.dataset.squadId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ activityWindow: parseInt(slider.value) }),
+        });
+        checkActivity(slider.dataset.squadId);
+      });
+    });
+
+    // Delete squad
+    document.querySelectorAll('.delete-squad-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Delete this squad?')) return;
+        await fetch(`${hubUrl}/api/bluesky-feed/squads/${btn.dataset.squadId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        loadSquads();
+      });
+    });
+
+    // Add member
+    document.querySelectorAll('.add-member-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const input = document.querySelector(`.add-member-input[data-squad-id="${btn.dataset.squadId}"]`);
+        const handle = input.value.trim();
+        if (!handle) return;
+
+        btn.textContent = '...';
+        btn.disabled = true;
+        try {
+          const res = await fetch(`${hubUrl}/api/bluesky-feed/squads/${btn.dataset.squadId}/members`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ handle }),
+          });
+          if (!res.ok) { const d = await res.json(); alert(d.error); return; }
+          input.value = '';
+          loadSquads();
+        } catch { alert('Failed to add member'); }
+        finally { btn.textContent = 'Add'; btn.disabled = false; }
+      });
+    });
+
+    // Toggle member list
+    document.querySelectorAll('.toggle-members-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const list = document.querySelector(`.members-list[data-squad-id="${btn.dataset.squadId}"]`);
+        const arrow = document.querySelector(`.toggle-members-arrow[data-squad-id="${btn.dataset.squadId}"]`);
+        list.classList.toggle('hidden');
+        arrow.textContent = list.classList.contains('hidden') ? '▶' : '▼';
+      });
+    });
+
+    // Remove member
+    document.querySelectorAll('.remove-member-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        await fetch(`${hubUrl}/api/bluesky-feed/squads/${btn.dataset.squadId}/members/${btn.dataset.memberId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        loadSquads();
+      });
+    });
+
+    // View squad feed
+    document.querySelectorAll('.view-squad-feed-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const feedEl = document.querySelector(`.squad-feed[data-squad-id="${btn.dataset.squadId}"]`);
+        if (!feedEl.classList.contains('hidden')) {
+          feedEl.classList.add('hidden');
+          btn.textContent = SQ.viewFeed;
+          return;
+        }
+
+        btn.textContent = 'Loading...';
+        try {
+          const res = await fetch(`${hubUrl}/api/bluesky-feed/squads/${btn.dataset.squadId}/feed`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await res.json();
+          feedEl.innerHTML = (data.posts || []).map(post => renderBskyCard(post)).join('') || `<div class="text-center py-4 text-theme-faint">${SQ.noPosts}</div>`;
+          feedEl.classList.remove('hidden');
+          btn.textContent = SQ.hideFeed;
+        } catch {
+          feedEl.innerHTML = '<div class="text-center py-4 text-red-400">Failed to load</div>';
+          feedEl.classList.remove('hidden');
+          btn.textContent = SQ.hideFeed;
+        }
+      });
+    });
+
+    // Click avatar to view author feed
+    document.querySelectorAll('.squad-member-avatar').forEach(el => {
+      el.addEventListener('click', async () => {
+        const handle = el.dataset.handle;
+        const squadEl = el.closest('[data-squad-id]');
+        const feedEl = squadEl.querySelector('.squad-feed');
+        const feedBtn = squadEl.querySelector('.view-squad-feed-btn');
+        if (!feedEl || !feedBtn) return;
+
+        feedBtn.textContent = `Loading @${handle}...`;
+        try {
+          const res = await fetch(`${hubUrl}/api/bluesky-feed/author/${encodeURIComponent(handle)}?limit=10`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await res.json();
+          feedEl.innerHTML = (data.posts || []).map(post => renderBskyCard(post)).join('') || `<div class="text-center py-4 text-theme-faint">${SQ.noPosts}</div>`;
+          feedEl.classList.remove('hidden');
+          feedBtn.textContent = SQ.hideFeed;
+        } catch {
+          feedEl.innerHTML = '<div class="text-center py-4 text-red-400">Failed to load</div>';
+          feedEl.classList.remove('hidden');
+          feedBtn.textContent = SQ.hideFeed;
+        }
+      });
+    });
+  }
+
+  // --- Render a single bsky post card ---
+  function renderBskyCard(post) {
+    const embed = post.embedData || {};
+    let embedHtml = '';
+
+    if (embed.images?.length > 1) {
+      embedHtml += `<div class="grid grid-cols-2 gap-1 mt-2 rounded overflow-hidden">
+        ${embed.images.map(img => `<img src="${esc(img.fullsize || img.thumb)}" alt="${esc(img.alt || '')}" class="w-full object-cover aspect-square" loading="lazy" onerror="this.style.display='none'" />`).join('')}
+      </div>`;
+    }
+
+    if (embed.images?.length === 1) {
+      embedHtml += `<div class="mt-2 bg-black flex justify-center rounded overflow-hidden"><img src="${esc(embed.images[0].fullsize || embed.images[0].thumb)}" alt="${esc(embed.images[0].alt || '')}" style="width:100%;max-height:20rem;object-fit:contain" loading="lazy" onerror="this.parentElement.style.display='none'" /></div>`;
+    }
+
+    if (embed.video?.playlist) {
+      embedHtml += `<div class="mt-2 rounded overflow-hidden bg-black aspect-video">
+        <video controls preload="none" poster="${esc(embed.video.thumb || '')}" class="w-full h-full">
+          <source src="${esc(embed.video.playlist)}" type="application/x-mpegURL" />
+        </video>
+      </div>`;
+    }
+
+    if (embed.external?.uri) {
+      embedHtml += `<a href="${esc(embed.external.uri)}" target="_blank" rel="noopener noreferrer" class="mt-2 block rounded border border-theme-border overflow-hidden hover:border-theme-border transition">
+        ${embed.external.thumb ? `<img src="${esc(embed.external.thumb)}" alt="" class="w-full aspect-[2/1] object-cover" loading="lazy" onerror="this.style.display='none'" />` : ''}
+        <div class="p-3">
+          <div class="text-sm font-medium text-theme-text line-clamp-1">${esc(embed.external.title || '')}</div>
+        </div>
+      </a>`;
+    }
+
+    if (embed.quote?.text) {
+      embedHtml += `<div class="mt-2 rounded border border-theme-border p-3 bg-theme-surface">
+        <div class="text-xs text-theme-muted mb-1">
+          <span class="font-medium text-theme-text">${esc(embed.quote.author)}</span>
+          <span class="text-theme-faint ml-1">@${esc(embed.quote.handle)}</span>
+        </div>
+        <p class="text-sm text-theme-text line-clamp-3">${esc(embed.quote.text)}</p>
+      </div>`;
+    }
+
+    return `
+    <article class="rounded-lg border border-theme-card-border bg-theme-card/50 p-4">
+      <div class="flex items-center gap-2 mb-2">
+        ${post.author.avatar ? `<img src="${esc(post.author.avatar)}" class="h-8 w-8 rounded-full" />` : ''}
+        <div>
+          <span class="text-sm font-medium">${esc(post.author.displayName)}</span>
+          <span class="text-xs text-theme-faint ml-1">@${esc(post.author.handle)}</span>
+        </div>
+        <time class="text-xs text-theme-faint ml-auto">${timeAgo(post.pubDate)}</time>
+      </div>
+      ${post.text ? `<p class="text-sm whitespace-pre-wrap">${esc(post.text)}</p>` : ''}
+      ${embedHtml}
+      <div class="mt-2 flex items-center gap-3 text-xs text-theme-faint">
+        <span>♡ ${post.likeCount}</span>
+        <span>🔁 ${post.repostCount}</span>
+        <span>💬 ${post.replyCount}</span>
+        <a href="${esc(post.link)}" target="_blank" class="hover:text-white ml-auto">↗ Open</a>
+      </div>
+    </article>`;
+  }
+
+  // --- Helpers ---
+  function esc(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function formatWindow(minutes) {
+    if (minutes < 60) return `${minutes}m`;
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return m ? `${h}h ${m}m` : `${h}h`;
+  }
+
+  function timeAgo(dateStr) {
+    if (!dateStr) return 'never';
+    const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  }
+</script>
+
+<style>
+  input[type="range"] {
+    height: 4px;
+    border-radius: 2px;
+    background: #3f3f46;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #3b82f6;
+    cursor: pointer;
+  }
+</style>

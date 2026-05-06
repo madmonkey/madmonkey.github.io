@@ -1,0 +1,53 @@
+---
+import { getCollection } from 'astro:content';
+import { withBase, cleanSlug } from '../../lib/config';
+
+const { heading = '', columns = '3' } = Astro.props;
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const galleries = (await getCollection('galleries') as any[])
+  .filter((g) => !g.data?.draft)
+  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+
+const colMap: Record<string, string> = {
+  '2': 'sm:grid-cols-2',
+  '3': 'sm:grid-cols-2 lg:grid-cols-3',
+  '4': 'sm:grid-cols-2 lg:grid-cols-4',
+};
+const gridCols = colMap[columns] || 'sm:grid-cols-2 lg:grid-cols-3';
+---
+
+<section>
+  {heading && <h2 class="mb-6 text-xl font-semibold">{heading}</h2>}
+  {galleries.length === 0 ? (
+    <p class="text-theme-faint">No galleries yet.</p>
+  ) : (
+    <div class={`grid grid-cols-1 gap-6 ${gridCols}`}>
+      {galleries.map((gallery) => (
+        <a
+          href={`${base}/galleries/${cleanSlug(gallery.id)}`}
+          class="group overflow-hidden rounded-lg border border-theme-card-border bg-theme-card transition hover:border-theme-card-hover"
+        >
+          {gallery.data.coverImage && (
+            <div class="aspect-video overflow-hidden">
+              <img
+                src={withBase(typeof gallery.data.coverImage === 'string' ? gallery.data.coverImage : gallery.data.coverImage.src)}
+                alt={gallery.data.title}
+                class="h-full w-full object-cover transition group-hover:scale-105"
+                loading="lazy"
+              />
+            </div>
+          )}
+          <div class="p-4">
+            <h3 class="font-medium">{gallery.data.title}</h3>
+            <p class="mt-1 text-sm text-theme-faint">{gallery.data.photos.length} photos</p>
+            {gallery.data.description && (
+              <p class="mt-1 text-sm text-theme-muted line-clamp-2">{gallery.data.description}</p>
+            )}
+          </div>
+        </a>
+      ))}
+    </div>
+  )}
+</section>

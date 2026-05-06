@@ -1,0 +1,85 @@
+---
+import { withBase } from '../lib/config';
+import labels from '../content/labels.json';
+
+interface Photo {
+  src: ImageMetadata | string;
+  alt?: string;
+  caption?: string;
+}
+
+interface Props {
+  photos: Photo[];
+}
+
+const { photos } = Astro.props;
+---
+
+<div class="my-8">
+  <h3 class="mb-4 text-lg font-semibold">{labels.galleries.gallery}</h3>
+  <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+    {photos.map((photo, i) => (
+      <button
+        class="group relative aspect-square overflow-hidden rounded cursor-pointer gallery-thumb"
+        data-index={i}
+      >
+        <img
+          src={withBase(typeof photo.src === 'string' ? photo.src : photo.src.src)}
+          alt={photo.alt || `Gallery image ${i + 1}`}
+          class="h-full w-full object-cover transition group-hover:scale-110"
+          loading="lazy"
+        />
+        {photo.caption && (
+          <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 opacity-0 group-hover:opacity-100 transition">
+            <p class="text-xs text-white">{photo.caption}</p>
+          </div>
+        )}
+      </button>
+    ))}
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div id="lightbox" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/95">
+  <button id="lb-close" class="absolute top-4 right-4 text-white text-2xl hover:text-theme-text z-10 cursor-pointer">&times;</button>
+  <button id="lb-prev" class="absolute left-4 top-1/2 -translate-y-1/2 text-white text-3xl hover:text-theme-text cursor-pointer">&lsaquo;</button>
+  <button id="lb-next" class="absolute right-4 top-1/2 -translate-y-1/2 text-white text-3xl hover:text-theme-text cursor-pointer">&rsaquo;</button>
+  <img id="lb-img" src="" alt="" class="max-h-[90vh] max-w-[90vw] object-contain" />
+  <p id="lb-caption" class="absolute bottom-6 left-1/2 -translate-x-1/2 text-sm text-theme-text"></p>
+</div>
+
+<script is:inline define:vars={{ photosJson: JSON.stringify(photos.map(p => ({ src: withBase(typeof p.src === 'string' ? p.src : p.src.src), alt: p.alt, caption: p.caption }))) }}>
+  const photos = JSON.parse(photosJson);
+  const lightbox = document.getElementById('lightbox');
+  const lbImg = document.getElementById('lb-img');
+  const lbCaption = document.getElementById('lb-caption');
+  let currentIndex = 0;
+
+  function showPhoto(i) {
+    currentIndex = ((i % photos.length) + photos.length) % photos.length;
+    const photo = photos[currentIndex];
+    lbImg.src = photo.src;
+    lbImg.alt = photo.alt || '';
+    lbCaption.textContent = photo.caption || '';
+    lightbox.classList.remove('hidden');
+    lightbox.classList.add('flex');
+  }
+
+  document.querySelectorAll('.gallery-thumb').forEach(btn => {
+    btn.addEventListener('click', () => showPhoto(parseInt(btn.dataset.index)));
+  });
+
+  document.getElementById('lb-close').addEventListener('click', () => {
+    lightbox.classList.add('hidden');
+    lightbox.classList.remove('flex');
+  });
+  document.getElementById('lb-prev').addEventListener('click', () => showPhoto(currentIndex - 1));
+  document.getElementById('lb-next').addEventListener('click', () => showPhoto(currentIndex + 1));
+
+  document.addEventListener('keydown', (e) => {
+    if (lightbox.classList.contains('hidden')) return;
+    if (e.key === 'Escape') document.getElementById('lb-close').click();
+    if (e.key === 'ArrowLeft') showPhoto(currentIndex - 1);
+    if (e.key === 'ArrowRight') showPhoto(currentIndex + 1);
+  });
+</script>

@@ -1,0 +1,26 @@
+---
+import { withBase } from '../../lib/config';
+
+const { src, alt = '', caption, lightbox = true, layout = 'contained' } = Astro.props;
+
+const wrapperClass = {
+  full: '',
+  contained: 'max-w-4xl mx-auto',
+  banner: 'max-h-[40vh] overflow-hidden',
+}[layout] || 'max-w-4xl mx-auto';
+
+const imgClass = layout === 'banner'
+  ? 'w-full h-full object-cover'
+  : 'w-full rounded-lg';
+---
+
+<section class={`mb-12 ${wrapperClass}`}>
+  {lightbox ? (
+    <a href={withBase(src)} class="glightbox block" data-description={caption || ''}>
+      <img src={withBase(src)} alt={alt} class={imgClass} loading="lazy" />
+    </a>
+  ) : (
+    <img src={withBase(src)} alt={alt} class={imgClass} loading="lazy" />
+  )}
+  {caption && <p class="mt-2 text-sm text-theme-muted text-center">{caption}</p>}
+</section>

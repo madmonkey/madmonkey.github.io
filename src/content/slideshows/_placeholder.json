@@ -1,0 +1,17 @@
+{
+  "title": "Placeholder Slideshow",
+  "description": "Internal placeholder to keep collections initialized.",
+  "draft": true,
+  "transition": "fade",
+  "interval": 5,
+  "autoplay": false,
+  "loop": false,
+  "showCaptions": false,
+  "showExif": false,
+  "photos": [
+    {
+      "src": "/images/logoImage.svg",
+      "alt": "Placeholder"
+    }
+  ]
+}

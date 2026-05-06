@@ -1,0 +1,508 @@
+---
+import { ClientRouter } from 'astro:transitions';
+import { siteConfig, withBase } from '../lib/config';
+import theme from '../content/theme.json';
+import labels from '../content/labels.json';
+import pwa from '../content/pwa.json';
+import settings from '../content/settings.json';
+import home from '../content/pages/home.json';
+import YouTubePlayer from '../components/YouTubePlayer.jsx';
+import '../styles/global.css';
+
+// Floating YouTube players from home blocks — rendered in layout so they persist across all pages
+const floatingPlayers = (home.blocks || []).filter((b: any) => b.type === 'youtube' && b.display === 'floating');
+
+interface Props {
+  title?: string;
+  description?: string;
+  image?: string;
+}
+
+const { title, description, image } = Astro.props;
+const defaultTitle = pwa.ogTitle || siteConfig.title;
+const pageTitle = title ? `${title} | ${defaultTitle}` : defaultTitle;
+const pageDescription = description || pwa.ogDescription || siteConfig.description;
+const siteOrigin = siteConfig.siteUrl.replace(/\/$/, '');
+// image prop already has base applied (via withBase in page); apply withBase to fallbacks
+const ogImageRaw = image || withBase(pwa.ogImage || '') || siteConfig.avatar || '';
+const ogImage = ogImageRaw.startsWith('http') ? ogImageRaw : `${siteOrigin}${ogImageRaw.startsWith('/') ? '' : '/'}${ogImageRaw}`;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const currentPath = Astro.url.pathname.replace(/\/$/, '') || '/';
+
+// Extract Google Font family names from CSS font-family strings
+function extractGoogleFont(cssValue: string): string | null {
+  const m = cssValue.match(/^'([^']+)'/);
+  return m ? m[1] : null;
+}
+
+const fontFamilies = new Set<string>();
+[theme.fonts.heading, theme.fonts.body, theme.fonts.mono].forEach(v => {
+  const name = extractGoogleFont(v);
+  if (name) fontFamilies.add(name);
+});
+
+const googleFontsUrl = fontFamilies.size
+  ? `https://fonts.googleapis.com/css2?${[...fontFamilies].map(f => `family=${f.replace(/ /g, '+')}:wght@300;400;500;600;700`).join('&')}&display=swap`
+  : null;
+
+// Build CSS custom property blocks
+const lt = theme.light;
+const dk = theme.dark;
+const lightVars = `--ps-bg:${lt.background};--ps-surface:${lt.surface};--ps-surface-border:${lt.surfaceBorder};--ps-surface-hover:${lt.surfaceHover};--ps-text:${lt.text};--ps-text-muted:${lt.textMuted};--ps-text-faint:${lt.textFaint};--ps-primary:${lt.primary};--ps-primary-hover:${lt.primaryHover};--ps-accent:${lt.accent};--ps-border:${lt.border};--ps-input-bg:${lt.inputBg};--ps-input-border:${lt.inputBorder};--ps-tag:${lt.tag};--ps-tag-text:${lt.tagText};--ps-card-bg:${lt.cardBg};--ps-card-border:${lt.cardBorder};--ps-card-hover:${lt.cardHover};--ps-header-bg:${lt.headerBg};--ps-footer-bg:${lt.footerBg}`;
+const darkVars = `--ps-bg:${dk.background};--ps-surface:${dk.surface};--ps-surface-border:${dk.surfaceBorder};--ps-surface-hover:${dk.surfaceHover};--ps-text:${dk.text};--ps-text-muted:${dk.textMuted};--ps-text-faint:${dk.textFaint};--ps-primary:${dk.primary};--ps-primary-hover:${dk.primaryHover};--ps-accent:${dk.accent};--ps-border:${dk.border};--ps-input-bg:${dk.inputBg};--ps-input-border:${dk.inputBorder};--ps-tag:${dk.tag};--ps-tag-text:${dk.tagText};--ps-card-bg:${dk.cardBg};--ps-card-border:${dk.cardBorder};--ps-card-hover:${dk.cardHover};--ps-header-bg:${dk.headerBg};--ps-footer-bg:${dk.footerBg}`;
+const fontVars = `--ps-font-heading:${theme.fonts.heading};--ps-font-body:${theme.fonts.body};--ps-font-mono:${theme.fonts.mono};--ps-heading-scale:${theme.fonts.headingSize || '1'};--ps-body-scale:${theme.fonts.bodySize || '1'}`;
+
+// Background image CSS
+const bgImg = theme.backgroundImage || {};
+const bgUrl = bgImg.url || '';
+const bgCss = bgUrl ? `body::before{content:'';position:fixed;inset:0;z-index:-1;background-image:url('${bgUrl}');background-size:${bgImg.size || 'cover'};background-position:${bgImg.position || 'center center'};background-attachment:${bgImg.attachment || 'fixed'};background-repeat:no-repeat;${parseInt(bgImg.blur || '0') > 0 ? `filter:blur(${bgImg.blur}px);transform:scale(1.1);` : ''}}` : '';
+
+// Social features toggle
+const enableSocial = settings.enableSocial !== false;
+const navStyle = (settings as any).navStyle || 'top';
+const socialPaths = ['/social', '/settings', '/admin'];
+const visibleNavItems = (labels.navItems || []).filter((item: any) => {
+  if (item.visible === false) return false;
+  if (!enableSocial && socialPaths.some(p => item.url?.startsWith(p))) return false;
+  return true;
+});
+
+// Auto-add pages with showInNav: true
+const pageFiles = import.meta.glob('../content/pages/*.json', { eager: true });
+const autoNavPages = Object.values(pageFiles)
+  .map((mod: any) => mod.default || mod)
+  .filter((p: any) => p.showInNav && p.slug && p.title)
+  .map((p: any) => ({ label: p.title, url: `/p/${p.slug}`, visible: true }));
+const allNavItems = [...visibleNavItems, ...autoNavPages];
+const regularNavItems = allNavItems.filter((item: any) => !socialPaths.some(p => item.url?.startsWith(p)));
+const socialNavItems = allNavItems.filter((item: any) => socialPaths.some(p => item.url?.startsWith(p)));
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={pageDescription} />
+    <meta name="generator" content={Astro.generator} />
+    {!pwa.searchEngineVisibility && <meta name="robots" content="noindex, nofollow" />}
+
+    <!-- Open Graph -->
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={pageDescription} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:url" content={`${siteOrigin}${Astro.url.pathname}`} />
+    <meta property="og:type" content="website" />
+
+    <!-- RSS -->
+    <link rel="alternate" type="application/rss+xml" title={siteConfig.title} href={`${base}/feed.xml`} />
+
+    <!-- Favicon & PWA -->
+    <link rel="icon" type={pwa.favicon?.endsWith('.svg') ? 'image/svg+xml' : 'image/png'} href={`${base}${pwa.favicon}`} />
+    <link rel="icon" type="image/png" sizes="192x192" href={`${base}${pwa.icon192}`} />
+    <link rel="apple-touch-icon" href={`${base}${pwa.appleTouchIcon}`} />
+    <link rel="manifest" href={`${base}/manifest.json`} />
+    <meta name="theme-color" content={pwa.themeColor || '#09090b'} id="meta-theme-color" />
+
+    <!-- Google Fonts -->
+    {googleFontsUrl && (
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+      <link rel="stylesheet" href={googleFontsUrl} />
+    )}
+
+    <!-- Theme CSS custom properties -->
+    <style set:html={`:root{${lightVars};${fontVars}}.dark{${darkVars}}${bgCss}html{font-size:calc(100% * var(--ps-body-scale,1));font-family:var(--ps-font-body)}`}></style>
+
+    <ClientRouter />
+
+    <script is:inline data-astro-rerun>
+      (function() {
+        const saved = localStorage.getItem('ps_theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const dark = saved ? saved === 'dark' : prefersDark;
+        if (dark) document.documentElement.classList.add('dark');
+        else document.documentElement.classList.remove('dark');
+      })();
+    </script>
+  </head>
+  <body class="min-h-screen bg-theme-bg text-theme-text font-body antialiased transition-colors duration-200">
+    <header class={`sticky top-0 z-40 border-b border-theme-border bg-theme-header/95 backdrop-blur supports-[backdrop-filter]:bg-theme-header/80${navStyle === 'float' ? ' hidden' : ''}`}>
+      <nav class="mx-auto flex max-w-6xl items-center justify-between px-3 py-2 md:px-4 md:py-4">
+        <a href={`${base}/`} class="flex items-center">
+          <span class="text-lg md:text-xl font-bold font-heading text-theme-text">{siteConfig.title}</span>
+        </a>
+        <div class={`flex items-center gap-3 text-xs md:gap-6 md:text-sm${navStyle === 'float' ? ' hidden' : ''}`}>
+          {regularNavItems.map((item: any) => {
+            const href = item.url.startsWith('/') ? `${base}${item.url}` : item.url;
+            const isActive = currentPath === (item.url.startsWith('/') ? `${base}${item.url}`.replace(/\/$/, '') : '');
+            return isActive
+              ? <span class="text-theme-text font-medium cursor-default" aria-current="page">{item.label}</span>
+              : <a href={href} class="text-theme-muted hover:text-theme-text transition">{item.label}</a>;
+          })}
+          {enableSocial && (
+            <span class="text-theme-border select-none" data-auth-only hidden>|</span>
+          )}
+          {socialNavItems.map((item: any) => {
+            const href = item.url.startsWith('/') ? `${base}${item.url}` : item.url;
+            const isActive = currentPath === (item.url.startsWith('/') ? `${base}${item.url}`.replace(/\/$/, '') : '');
+            const isSocialPage = item.url === '/social';
+            const isSettingsPage = item.url === '/settings';
+            const activeClass = isActive ? 'text-theme-text' : 'text-theme-muted hover:text-theme-text';
+            const Tag = isActive ? 'span' : 'a';
+            if (isSocialPage) {
+              return isActive
+                ? <span class={`${activeClass} inline-flex items-center gap-1 cursor-default`} aria-current="page" data-auth-only hidden>
+                    <img src={`${base}${settings.logo?.image || '/images/logoImage.svg'}`} alt="Social" class="h-8 w-8" />
+                    <button id="notif-bell" class="relative p-0.5 text-theme-muted hover:text-theme-text transition" aria-label="Notifications" hidden>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                      <span id="notif-badge" class="absolute -top-1 -right-1 min-w-[14px] h-[14px] rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none px-0.5" hidden></span>
+                    </button>
+                  </span>
+                : <a href={href} class={`${activeClass} transition inline-flex items-center gap-1`} data-auth-only hidden>
+                    <img src={`${base}${settings.logo?.image || '/images/logoImage.svg'}`} alt="Social" class="h-8 w-8" />
+                    <button id="notif-bell" class="relative p-0.5 text-theme-muted hover:text-theme-text transition" aria-label="Notifications" hidden>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                      <span id="notif-badge" class="absolute -top-1 -right-1 min-w-[14px] h-[14px] rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none px-0.5" hidden></span>
+                    </button>
+                  </a>;
+            }
+            if (isSettingsPage) {
+              return isActive
+                ? <span class={`${activeClass} cursor-default`} aria-current="page" data-auth-only hidden title="Settings">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="inline-block"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                  </span>
+                : <a href={href} class={`${activeClass} transition`} data-auth-only hidden title="Settings">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="inline-block"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                  </a>;
+            }
+            return null;
+          })}
+          {enableSocial && (
+            currentPath === `${base}/admin`
+              ? <span class="text-theme-text cursor-default" aria-current="page" data-auth-only hidden title="Admin">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="inline-block"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/></svg>
+                </span>
+              : <a href={`${base}/admin`} class="text-theme-muted hover:text-theme-text transition" data-auth-only hidden title="Admin">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="inline-block"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/></svg>
+                </a>
+          )}
+          <button id="logout-btn" class="text-theme-muted hover:text-red-400 transition" data-auth-only hidden title="Sign out" aria-label="Sign out">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="inline-block"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          </button>
+        </div>
+      </nav>
+    </header>
+
+    <main class={`mx-auto max-w-6xl px-4${navStyle === 'float' ? ' py-4 pb-28' : ' py-8'}`}>
+      <slot />
+    </main>
+
+    <!-- Theme toggle -->
+    <button id="theme-toggle" class="fixed bottom-4 left-4 z-50 rounded-full p-2.5 bg-theme-surface-hover text-theme-muted hover:bg-theme-card-hover transition shadow-lg border border-theme-border" aria-label="Toggle theme">
+      <svg id="theme-icon-sun" class="w-5 h-5 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      <svg id="theme-icon-moon" class="w-5 h-5 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/></svg>
+    </button>
+
+    <!-- Back + Scroll to top -->
+    <div class="fixed bottom-4 right-4 z-50 flex items-center gap-2">
+      <button id="back-btn" class="hidden rounded-full p-2.5 bg-theme-surface-hover text-theme-muted hover:bg-theme-card-hover transition shadow-lg border border-theme-border" aria-label="Go back">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 12H5m0 0l7 7m-7-7l7-7"/></svg>
+      </button>
+      <button id="top-btn" class="hidden rounded-full p-2.5 bg-theme-surface-hover text-theme-muted hover:bg-theme-card-hover transition shadow-lg border border-theme-border" aria-label="Back to top">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 15l7-7 7 7"/></svg>
+      </button>
+    </div>
+
+    <!-- Float nav menu (shown when navStyle = 'float') -->
+    <div id="float-nav-panel" class="fixed z-50 w-56 max-w-[calc(100vw-2rem)] rounded-2xl border border-theme-border bg-theme-surface shadow-2xl overflow-hidden" style="left:50%;bottom:5rem;transform:translateX(-50%) translateY(0.75rem);opacity:0;transition:transform .18s ease,opacity .18s ease" aria-hidden="true" hidden>
+      <nav class="flex flex-col py-2">
+        <a href={`${base}/`} class="px-5 py-3 text-sm font-bold font-heading text-theme-text hover:bg-theme-surface-hover transition">{siteConfig.title}</a>
+        <div class="my-1 border-t border-theme-border"></div>
+        {regularNavItems.map((item: any) => {
+          const href = item.url.startsWith('/') ? `${base}${item.url}` : item.url;
+          const isActive = currentPath === (item.url.startsWith('/') ? `${base}${item.url}`.replace(/\/$/, '') : '');
+          return isActive
+            ? <span class="px-5 py-3 text-sm font-medium text-theme-text bg-theme-surface-hover block" aria-current="page">{item.label}</span>
+            : <a href={href} class="px-5 py-3 text-sm text-theme-muted hover:bg-theme-surface-hover hover:text-theme-text transition block">{item.label}</a>;
+        })}
+        {enableSocial && socialNavItems.length > 0 && (
+          <div class="my-1 border-t border-theme-border" data-auth-only hidden></div>
+        )}
+        {enableSocial && socialNavItems.map((item: any) => {
+          const href = item.url.startsWith('/') ? `${base}${item.url}` : item.url;
+          const isActive = currentPath === (item.url.startsWith('/') ? `${base}${item.url}`.replace(/\/$/, '') : '');
+          return isActive
+            ? <span class="px-5 py-3 text-sm font-medium text-theme-text bg-theme-surface-hover block" aria-current="page" data-auth-only hidden>{item.label}</span>
+            : <a href={href} class="px-5 py-3 text-sm text-theme-muted hover:bg-theme-surface-hover hover:text-theme-text transition block" data-auth-only hidden>{item.label}</a>;
+        })}
+        {enableSocial && (
+          <a href={`${base}/admin`} class="px-5 py-3 text-sm text-theme-muted hover:bg-theme-surface-hover hover:text-theme-text transition block" data-auth-only hidden>Admin</a>
+        )}
+        {enableSocial && (
+          <button id="float-notif-btn" class="px-5 py-3 text-sm text-left text-theme-muted hover:bg-theme-surface-hover hover:text-theme-text transition w-full flex items-center gap-2" data-auth-only hidden>
+            <span class="relative inline-flex">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+              <span id="float-notif-menu-badge" class="absolute -top-1 -right-1 min-w-[14px] h-[14px] rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none px-0.5" hidden></span>
+            </span>
+            Notifications
+          </button>
+        )}
+        {enableSocial && (
+          <button id="float-logout-btn" class="px-5 py-3 text-sm text-left text-red-400 hover:bg-theme-surface-hover transition w-full" data-auth-only hidden>Sign out</button>
+        )}
+      </nav>
+    </div>
+    <!-- Float nav controls: hamburger + bell (auth-only), centered at bottom -->
+    <div class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center" style={navStyle !== 'float' ? 'display:none !important' : ''}>
+      <button id="float-menu-btn"
+        class="relative rounded-full p-3 bg-theme-surface border border-theme-border text-theme-muted hover:bg-theme-card-hover transition shadow-lg"
+        aria-label="Open navigation menu" aria-expanded="false" aria-controls="float-nav-panel">
+        <svg class="w-5 h-5" id="float-menu-icon-open" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        <svg class="w-5 h-5 hidden" id="float-menu-icon-close" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <button id="float-bell-btn"
+        class="relative -ml-px rounded-full p-1.5 bg-theme-surface border border-theme-border text-theme-muted hover:bg-theme-card-hover transition shadow-lg"
+        aria-label="Notifications" data-auth-only hidden>
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        <span id="float-notif-badge" class="absolute -top-1 -right-1 min-w-[12px] h-[12px] rounded-full bg-red-500 text-white text-[8px] font-bold flex items-center justify-center leading-none px-0.5" hidden></span>
+      </button>
+    </div>
+    <div id="float-menu-backdrop" class="fixed inset-0 z-40 hidden bg-black/30" aria-hidden="true" style={navStyle !== 'float' ? 'display:none !important' : ''}></div>
+
+    {/* Floating players — in layout so they persist across all page navigations */}
+    {floatingPlayers.map((block: any, i: number) => (
+      <div transition:persist={`floating-player-${i}`}>
+        <YouTubePlayer
+          client:load
+          url={block.url}
+          heading={block.heading}
+          caption={block.caption}
+          audioOnly={block.audioOnly}
+          display="floating"
+          tracks={block.tracks}
+          layout={block.layout}
+          labels={labels.player || {}}
+          startTime={block.startTime}
+          endTime={block.endTime}
+          useNativeControls={block.useNativeControls}
+        />
+      </div>
+    ))}
+
+    <!-- footer hidden for now -->
+    <!--
+    <footer class="border-t border-theme-border bg-theme-footer mt-16">
+      <div class="mx-auto max-w-6xl px-4 py-8 text-center text-sm text-theme-faint">
+        <p>{labels.footer.poweredBy.split('Pirate Social')[0]}<a href="https://github.com/piratesocial" class="underline hover:text-theme-text">Pirate Social</a></p>
+        <p class="mt-1">Part of the distributed photography network &middot; <a href={`${base}/feed.xml`} class="underline">{labels.nav.rss}</a></p>
+      </div>
+    </footer>
+    -->
+
+    <script is:inline define:vars={{ hubUrl: siteConfig.hubUrl, socialEnabled: enableSocial, psBase: base }} data-astro-rerun>
+      // Handle auth token from OAuth redirect
+      window.__PS_BASE = psBase;
+      window.__psStorageKey = (key) => `${key}:${window.__PS_BASE || '/'}`;
+
+      // Navigate to notifications tab: soft-switch if already on social page, else hard navigate
+      function goToNotifications() {
+        const socialPath = (psBase || '').replace(/\/$/, '') + '/social';
+        const onSocial = window.location.pathname === socialPath || window.location.pathname === socialPath + '/';
+        if (onSocial && typeof window.__switchSocialTab === 'function') {
+          window.__switchSocialTab('notifications');
+        } else {
+          localStorage.setItem(window.__psStorageKey('ps_open_tab'), 'notifications');
+          window.location.href = socialPath;
+        }
+      }
+
+      if (socialEnabled) {
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('token');
+        if (token) {
+          localStorage.setItem(window.__psStorageKey('ps_token'), token);
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+
+        // Show auth-only nav links when logged in
+        const savedToken = localStorage.getItem(window.__psStorageKey('ps_token'));
+        if (savedToken) {
+          document.querySelectorAll('[data-auth-only]').forEach(el => el.removeAttribute('hidden'));
+
+          // Logout handler
+          document.getElementById('logout-btn')?.addEventListener('click', () => {
+            localStorage.removeItem(window.__psStorageKey('ps_token'));
+            localStorage.removeItem(window.__psStorageKey('ps_bsky_session'));
+            window.location.href = psBase + '/';
+          });
+        }
+        if (savedToken) {
+          // Show notification bell and poll for unread count
+          const bell = document.getElementById('notif-bell');
+          const badge = document.getElementById('notif-badge');
+          if (bell) {
+            bell.removeAttribute('hidden');
+
+            // Click bell: navigate to social page with notifications tab
+            bell.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              goToNotifications();
+            });
+
+            // Poll unread count
+            async function pollUnread() {
+              try {
+                const res = await fetch(`${hubUrl}/api/notifications/bluesky/unread`, {
+                  headers: { Authorization: `Bearer ${savedToken}` },
+                });
+                if (res.ok) {
+                  const data = await res.json();
+                  const count = data.count || 0;
+                  const floatBadge = document.getElementById('float-notif-badge');
+                  const floatMenuBadge = document.getElementById('float-notif-menu-badge');
+                  if (count > 0) {
+                    const label = count > 99 ? '99+' : count;
+                    badge.textContent = label;
+                    badge.removeAttribute('hidden');
+                    if (floatBadge) { floatBadge.textContent = label; floatBadge.removeAttribute('hidden'); }
+                    if (floatMenuBadge) { floatMenuBadge.textContent = label; floatMenuBadge.removeAttribute('hidden'); }
+                  } else {
+                    badge.setAttribute('hidden', '');
+                    if (floatBadge) floatBadge.setAttribute('hidden', '');
+                    if (floatMenuBadge) floatMenuBadge.setAttribute('hidden', '');
+                  }
+                  // Update app badge if supported
+                  if (navigator.setAppBadge) {
+                    if (count > 0) navigator.setAppBadge(count);
+                    else navigator.clearAppBadge?.();
+                  }
+                }
+              } catch {}
+            }
+            pollUnread();
+            setInterval(pollUnread, 60000); // Poll every 60s
+
+            // Also listen for SSE updates for real-time badge
+            try {
+              const userId = JSON.parse(atob(savedToken.split('.')[1])).userId;
+              if (userId) {
+                const es = new EventSource(`${hubUrl}/api/stream?userId=${encodeURIComponent(userId)}`);
+                es.onmessage = (event) => {
+                  try {
+                    const msg = JSON.parse(event.data);
+                    if (msg.type === 'notification' || msg.type === 'nudge') {
+                      pollUnread();
+                    }
+                  } catch {}
+                };
+              }
+            } catch {}
+          }
+        }
+      }
+
+      // Register service worker for push notifications
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+        // Listen for push messages forwarded from SW
+        navigator.serviceWorker.addEventListener('message', (event) => {
+          if (event.data?.type === 'PUSH_NOTIFICATION') {
+            // Refresh badge count
+            const bell = document.getElementById('notif-bell');
+            if (bell) {
+              const savedTkn = localStorage.getItem(window.__psStorageKey('ps_token'));
+              if (savedTkn) {
+                fetch(`${hubUrl}/api/notifications/bluesky/unread`, {
+                  headers: { Authorization: `Bearer ${savedTkn}` },
+                }).then(r => r.json()).then(d => {
+                  const badge = document.getElementById('notif-badge');
+                  if (badge && d.count > 0) {
+                    badge.textContent = d.count > 99 ? '99+' : d.count;
+                    badge.removeAttribute('hidden');
+                  }
+                }).catch(() => {});
+              }
+            }
+          }
+        });
+      }
+
+      // Theme toggle
+      function updateThemeUI() {
+        const isDark = document.documentElement.classList.contains('dark');
+        document.getElementById('theme-icon-sun')?.classList.toggle('hidden', !isDark);
+        document.getElementById('theme-icon-moon')?.classList.toggle('hidden', isDark);
+        const meta = document.getElementById('meta-theme-color');
+        if (meta) meta.content = isDark ? '#09090b' : '#ffffff';
+      }
+      updateThemeUI();
+
+      document.getElementById('theme-toggle')?.addEventListener('click', () => {
+        const isDark = document.documentElement.classList.toggle('dark');
+        localStorage.setItem('ps_theme', isDark ? 'dark' : 'light');
+        updateThemeUI();
+      });
+
+      // Back button — show only when there's history to go back to
+      const backBtn = document.getElementById('back-btn');
+      if (backBtn && window.history.length > 1 && window.location.pathname !== '/') {
+        backBtn.classList.remove('hidden');
+        backBtn.addEventListener('click', () => window.history.back());
+      }
+
+      // Scroll to top button — show after scrolling down
+      const topBtn = document.getElementById('top-btn');
+      if (topBtn) {
+        const toggleTop = () => topBtn.classList.toggle('hidden', window.scrollY < 300);
+        toggleTop();
+        window.addEventListener('scroll', toggleTop, { passive: true });
+        topBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+      }
+
+      // Float nav menu
+      const floatBtn = document.getElementById('float-menu-btn');
+      const floatPanel = document.getElementById('float-nav-panel');
+      const floatBackdrop = document.getElementById('float-menu-backdrop');
+      if (floatBtn && floatPanel) {
+        function openFloatMenu() {
+          floatPanel.hidden = false;
+          floatPanel.removeAttribute('aria-hidden');
+          void floatPanel.offsetHeight; // force reflow before transition
+          floatPanel.style.opacity = '1';
+          floatPanel.style.transform = 'translateX(-50%) translateY(0)';
+          floatBackdrop?.classList.remove('hidden');
+          floatBtn.setAttribute('aria-expanded', 'true');
+          document.getElementById('float-menu-icon-open')?.classList.add('hidden');
+          document.getElementById('float-menu-icon-close')?.classList.remove('hidden');
+        }
+        function closeFloatMenu() {
+          floatPanel.style.opacity = '0';
+          floatPanel.style.transform = 'translateX(-50%) translateY(0.75rem)';
+          floatPanel.setAttribute('aria-hidden', 'true');
+          floatBackdrop?.classList.add('hidden');
+          floatBtn.setAttribute('aria-expanded', 'false');
+          document.getElementById('float-menu-icon-open')?.classList.remove('hidden');
+          document.getElementById('float-menu-icon-close')?.classList.add('hidden');
+          setTimeout(() => { if (floatPanel.getAttribute('aria-hidden') === 'true') floatPanel.hidden = true; }, 200);
+        }
+        floatBtn.addEventListener('click', () => {
+          floatBtn.getAttribute('aria-expanded') === 'true' ? closeFloatMenu() : openFloatMenu();
+        });
+        floatBackdrop?.addEventListener('click', closeFloatMenu);
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeFloatMenu(); });
+        // Close on nav link click
+        floatPanel.querySelectorAll('a').forEach(a => a.addEventListener('click', closeFloatMenu));
+      }
+      document.getElementById('float-logout-btn')?.addEventListener('click', () => {
+        localStorage.removeItem(window.__psStorageKey('ps_token'));
+        localStorage.removeItem(window.__psStorageKey('ps_bsky_session'));
+        window.location.href = psBase + '/';
+      });
+      document.getElementById('float-bell-btn')?.addEventListener('click', () => goToNotifications());
+      document.getElementById('float-notif-btn')?.addEventListener('click', () => { closeFloatMenu(); goToNotifications(); });
+    </script>
+  </body>
+</html>

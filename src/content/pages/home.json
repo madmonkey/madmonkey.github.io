@@ -1,0 +1,25 @@
+{
+  "title": "Home",
+  "slug": "home",
+  "showInNav": false,
+  "blocks": [
+    {
+      "type": "hero",
+      "heading": "Welcome to Your Pirate Social Site",
+      "subheading": "This is your starter homepage. Edit this page in /admin to make it yours.",
+      "align": "left",
+      "showAvatar": false
+    },
+    {
+      "type": "text",
+      "layout": "narrow",
+      "body": "### Start Here\n\n- Open **/admin** to edit content visually\n- Publish your first post from the **Posts** collection\n- Update your profile in **Settings**\n- Visit the **Start Here** page for setup tips"
+    },
+    {
+      "type": "recentPosts",
+      "heading": "Latest Posts",
+      "count": 3,
+      "columns": "3"
+    }
+  ]
+}

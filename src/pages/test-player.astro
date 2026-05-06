@@ -1,0 +1,30 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="ClipSlide Test" description="Testing ClipSlide's exact YouTube player code">
+  <main style="min-height: 80vh; padding: 2rem 1rem; background: #111;">
+    <div style="max-width: 800px; margin: 0 auto;">
+      <p style="color: #888; font-size: 14px; margin-bottom: 20px; line-height: 1.5;">
+        This is a <strong style="color: #ff4444;">direct 1:1 port</strong> of ClipSlide's SlideshowPlayer YouTube code.
+        <br/>Same API, same playerVars, same loadVideoById pattern.
+        <br/>If this shows ads, the issue is NOT in the code — it's domain/env/browser.
+        <br/>If this is ad-free, there's a difference in our YouTubePlayer.jsx.
+      </p>
+    </div>
+
+    <div id="clipslide-test">
+      <noscript>JavaScript is required to test the YouTube player.</noscript>
+    </div>
+  </main>
+</BaseLayout>
+
+<script>
+  import { h, render } from 'preact';
+  import ClipSlideTest from '../components/ClipSlideTest.jsx';
+
+  const container = document.getElementById('clipslide-test');
+  if (container) {
+    render(h(ClipSlideTest, {}), container);
+  }
+</script>

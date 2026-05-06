@@ -1,0 +1,60 @@
+{
+  "backgroundImage": {
+    "url": "",
+    "size": "cover",
+    "position": "center center",
+    "attachment": "fixed",
+    "blur": "0"
+  },
+  "fonts": {
+    "heading": "'Figtree', sans-serif",
+    "body": "'Lato', sans-serif",
+    "mono": "ui-monospace, monospace",
+    "headingSize": "1",
+    "bodySize": "1.2"
+  },
+  "light": {
+    "footerBg": "#ffffff",
+    "primary": "#3bf652",
+    "textFaint": "#71717a",
+    "tagText": "#52525b",
+    "accent": "#8b5cf6",
+    "cardHover": "#d4d4d8",
+    "border": "#e4e4e7",
+    "surface": "#ffffff",
+    "text": "#18181b",
+    "background": "#ffffff",
+    "surfaceHover": "#f4f4f5",
+    "inputBg": "#f4f4f5",
+    "headerBg": "#ffffff",
+    "cardBg": "#ffffff",
+    "inputBorder": "#d4d4d8",
+    "surfaceBorder": "#e4e4e7",
+    "primaryHover": "#2563eb",
+    "tag": "#f4f4f5",
+    "cardBorder": "#e4e4e7",
+    "textMuted": "#52525b"
+  },
+  "dark": {
+    "footerBg": "#09090b",
+    "primary": "#3b82f6",
+    "textFaint": "#71717a",
+    "tagText": "#a1a1aa",
+    "accent": "#8b5cf6",
+    "cardHover": "#3f3f46",
+    "border": "#27272a",
+    "surface": "#18181b",
+    "text": "#f4f4f5",
+    "background": "#09090b",
+    "surfaceHover": "#27272a",
+    "inputBg": "#27272a",
+    "headerBg": "#09090b",
+    "cardBg": "#18181b",
+    "inputBorder": "#3f3f46",
+    "surfaceBorder": "#27272a",
+    "primaryHover": "#60a5fa",
+    "tag": "#27272a",
+    "cardBorder": "#27272a",
+    "textMuted": "#a1a1aa"
+  }
+}

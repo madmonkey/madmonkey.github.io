@@ -1,0 +1,27 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  # Rebuild weekly to pick up template updates
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    uses: piratewebsite/piratesocial/.github/workflows/deploy-core.yml@main
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    secrets: inherit

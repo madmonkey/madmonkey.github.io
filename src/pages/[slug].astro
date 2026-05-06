@@ -1,0 +1,20 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import BlockRenderer from '../components/BlockRenderer.astro';
+import { getCollection, type CollectionEntry } from 'astro:content';
+
+export async function getStaticPaths() {
+  const pages = await getCollection('pages');
+  // Exclude 'home' — that's handled by index.astro
+  return pages
+    .filter((p: CollectionEntry<'pages'>) => p.data.slug !== 'home')
+    .map((p: CollectionEntry<'pages'>) => ({ params: { slug: p.data.slug }, props: { page: p } }));
+}
+
+interface Props { page: CollectionEntry<'pages'>; }
+const { page } = Astro.props as Props;
+---
+
+<BaseLayout title={page.data.title} description={page.data.description}>
+  <BlockRenderer blocks={page.data.blocks || []} />
+</BaseLayout>

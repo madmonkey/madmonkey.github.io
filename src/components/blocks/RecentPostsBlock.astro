@@ -1,0 +1,63 @@
+---
+import { getCollection } from 'astro:content';
+import { withBase, cleanSlug } from '../../lib/config';
+import settings from '../../content/settings.json';
+import labels from '../../content/labels.json';
+
+const { heading = 'Recent', count = 6, columns = '3' } = Astro.props;
+
+const showDates = settings.showDates !== false;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const posts = (await getCollection('posts'))
+  .filter(p => !p.data.draft && p.data.visibility !== 'private')
+  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
+  .slice(0, count);
+
+const gridCols = {
+  '2': 'sm:grid-cols-2',
+  '3': 'sm:grid-cols-2 lg:grid-cols-3',
+  '4': 'sm:grid-cols-2 lg:grid-cols-4',
+}[columns] || 'sm:grid-cols-2 lg:grid-cols-3';
+---
+
+<section>
+  {heading && <h2 class="mb-6 text-xl font-semibold">{heading}</h2>}
+  <div class={`grid grid-cols-1 gap-6 ${gridCols}`}>
+    {posts.map((post) => (
+      <a
+        href={`${base}/posts/${cleanSlug(post.id)}`}
+        class="group overflow-hidden rounded-lg border border-theme-card-border bg-theme-card transition hover:border-theme-card-hover"
+      >
+        {post.data.image && (
+          <div class="aspect-[4/3] overflow-hidden">
+            <img
+              src={withBase(typeof post.data.image === 'string' ? post.data.image : post.data.image.src)}
+              alt={post.data.imageAlt || post.data.title}
+              class="h-full w-full object-cover transition group-hover:scale-105"
+              loading="lazy"
+            />
+          </div>
+        )}
+        <div class="p-4">
+          <h3 class="font-medium">{post.data.title}</h3>
+          {showDates && (
+            <time class="mt-1 text-xs text-theme-faint" datetime={post.data.pubDate.toISOString()}>
+              {post.data.pubDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+            </time>
+          )}
+          {post.data.tags.length > 0 && (
+            <div class="mt-2 flex flex-wrap gap-1">
+              {post.data.tags.slice(0, 3).map(tag => (
+                <span class="rounded bg-theme-tag px-2 py-0.5 text-xs text-theme-tag-text">{tag}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      </a>
+    ))}
+  </div>
+  <div class="mt-8 text-center">
+    <a href={`${base}/posts`} class="text-sm text-theme-muted underline hover:text-theme-text">{labels.home.viewAllPosts}</a>
+  </div>
+</section>

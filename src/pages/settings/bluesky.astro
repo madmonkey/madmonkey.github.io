@@ -1,0 +1,256 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { siteConfig } from '../../lib/config';
+import labels from '../../content/labels.json';
+const bl = labels.bluesky;
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<BaseLayout title="Bluesky Settings">
+  <div class="mx-auto max-w-xl">
+    <h1 class="text-2xl font-bold mb-6">{bl.heading}</h1>
+    <p class="text-theme-muted text-sm mb-8">
+      Connect your Bluesky account to automatically cross-post your photos.
+      New posts published to your site will appear on Bluesky with images and links back to your site.
+    </p>
+
+    <div id="auth-required" class="hidden text-center py-12 text-theme-faint">
+      <p>Sign in to manage your Bluesky connection</p>
+      <a href={`${base}/social/`} class="mt-4 inline-block rounded bg-theme-primary text-white px-4 py-2 text-sm font-medium hover:bg-theme-primary-hover transition">
+        {labels.settings.signInButton}
+      </a>
+    </div>
+
+    <div id="bluesky-settings" class="hidden space-y-6">
+      <!-- Status card -->
+      <div id="status-card" class="rounded-lg border border-theme-card-border bg-theme-card p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold">{bl.connectionStatus}</h2>
+          <span id="status-badge" class="text-xs px-2 py-1 rounded-full"></span>
+        </div>
+        <div id="status-details" class="text-sm text-theme-muted"></div>
+      </div>
+
+      <!-- Connect form (shown when not connected) -->
+      <div id="connect-form" class="hidden rounded-lg border border-theme-card-border bg-theme-card p-6">
+        <h2 class="text-lg font-semibold mb-4">{bl.connectHeading}</h2>
+        <p class="text-sm text-theme-muted mb-4">
+          Use an <a href="https://bsky.app/settings/app-passwords" target="_blank" class="text-theme-primary hover:underline">App Password</a> — never your main password.
+        </p>
+        <form id="bsky-connect-form" class="space-y-4">
+          <div>
+            <label for="bsky-handle" class="block text-sm font-medium mb-1">{bl.handleLabel}</label>
+            <input type="text" id="bsky-handle" placeholder="yourname.bsky.social"
+              class="w-full rounded bg-theme-input-bg border border-theme-input-border px-3 py-2 text-sm focus:outline-none focus:border-theme-primary" />
+          </div>
+          <div>
+            <label for="bsky-password" class="block text-sm font-medium mb-1">{bl.passwordLabel}</label>
+            <input type="password" id="bsky-password" placeholder="xxxx-xxxx-xxxx-xxxx"
+              class="w-full rounded bg-theme-input-bg border border-theme-input-border px-3 py-2 text-sm focus:outline-none focus:border-theme-primary" />
+          </div>
+          <div id="connect-error" class="hidden text-red-400 text-sm"></div>
+          <button type="submit" class="w-full rounded bg-theme-primary px-4 py-2 text-sm font-medium text-white hover:bg-theme-primary-hover transition">
+            {bl.connectButton}
+          </button>
+        </form>
+      </div>
+
+      <!-- Connected actions (shown when connected) -->
+      <div id="connected-actions" class="hidden space-y-4">
+        <div class="flex gap-3">
+          <button id="toggle-btn" class="flex-1 rounded px-4 py-2 text-sm font-medium transition"></button>
+          <button id="disconnect-btn" class="rounded bg-red-900 px-4 py-2 text-sm font-medium hover:bg-red-800 transition">
+            Disconnect
+          </button>
+        </div>
+      </div>
+      <!-- Social Display Settings -->
+      <div class="rounded-lg border border-theme-card-border bg-theme-card p-6">
+        <h2 class="text-lg font-semibold mb-4">Social Display</h2>
+
+        <!-- Squad Highlighting -->
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-sm font-medium">Highlight Squad Posts</div>
+              <div class="text-xs text-theme-muted">Show a badge and colored border on posts from squad members</div>
+              <div class="text-xs text-theme-faint mt-1">Set colors per squad in the Squads tab on Social</div>
+            </div>
+            <button id="squad-highlight-toggle" class="relative w-10 h-5 rounded-full transition-colors" style="background:var(--ps-input-border,#444)">
+              <span class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-all"></span>
+            </button>
+          </div>
+
+          <!-- Mini Player -->
+          <div class="flex items-center justify-between pt-4 border-t border-theme-card-border">
+            <div>
+              <div class="text-sm font-medium">Video Mini-Player</div>
+              <div class="text-xs text-theme-muted">Float playing videos when scrolled out of view</div>
+            </div>
+            <button id="miniplayer-toggle" class="relative w-10 h-5 rounded-full transition-colors" style="background:var(--ps-input-border,#444)">
+              <span class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-all"></span>
+            </button>
+          </div>
+
+          <button id="reset-miniplayer-pos" class="text-xs text-theme-faint hover:text-theme-text transition">Reset mini-player position</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<script is:inline define:vars={{ hubUrl: siteConfig.hubUrl, BL: labels.bluesky }} data-astro-rerun>
+  const authStorageKey = (key) => `${key}:${window.__PS_BASE || '/'}`;
+  const token = localStorage.getItem(authStorageKey('ps_token'));
+
+  // Social display settings
+  const defaultSocialSettings = { squadHighlight: true, squadBorderColor: '#eab308', miniPlayerEnabled: true, miniPlayerX: null, miniPlayerY: null };
+  let socialSettings = { ...defaultSocialSettings };
+  try { const s = JSON.parse(localStorage.getItem('ps_social_settings')); if (s) socialSettings = { ...defaultSocialSettings, ...s }; } catch {}
+  function saveSocialSettings() { localStorage.setItem('ps_social_settings', JSON.stringify(socialSettings)); }
+
+  function initSocialSettings() {
+    const highlightToggle = document.getElementById('squad-highlight-toggle');
+    const miniToggle = document.getElementById('miniplayer-toggle');
+    const resetPos = document.getElementById('reset-miniplayer-pos');
+
+    function updateToggle(btn, on) {
+      btn.style.background = on ? 'var(--ps-accent,#3b82f6)' : 'var(--ps-input-border,#444)';
+      const dot = btn.querySelector('span');
+      dot.style.left = on ? '' : '2px';
+      dot.style.right = on ? '2px' : '';
+    }
+
+    updateToggle(highlightToggle, socialSettings.squadHighlight);
+    updateToggle(miniToggle, socialSettings.miniPlayerEnabled);
+
+    highlightToggle.addEventListener('click', () => {
+      socialSettings.squadHighlight = !socialSettings.squadHighlight;
+      updateToggle(highlightToggle, socialSettings.squadHighlight);
+      saveSocialSettings();
+    });
+
+    miniToggle.addEventListener('click', () => {
+      socialSettings.miniPlayerEnabled = !socialSettings.miniPlayerEnabled;
+      updateToggle(miniToggle, socialSettings.miniPlayerEnabled);
+      saveSocialSettings();
+    });
+
+    resetPos.addEventListener('click', () => {
+      socialSettings.miniPlayerX = null;
+      socialSettings.miniPlayerY = null;
+      saveSocialSettings();
+      resetPos.textContent = 'Position reset ✓';
+      setTimeout(() => { resetPos.textContent = 'Reset mini-player position'; }, 1500);
+    });
+  }
+
+  if (!token) {
+    document.getElementById('auth-required').classList.remove('hidden');
+  } else {
+    document.getElementById('bluesky-settings').classList.remove('hidden');
+    loadStatus();
+    initSocialSettings();
+  }
+
+  async function loadStatus() {
+    try {
+      const res = await fetch(`${hubUrl}/api/bluesky/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      renderStatus(data);
+    } catch (err) {
+      console.error('Failed to load Bluesky status:', err);
+      renderStatus({ connected: false });
+    }
+  }
+
+  function renderStatus(data) {
+    const badge = document.getElementById('status-badge');
+    const details = document.getElementById('status-details');
+    const connectForm = document.getElementById('connect-form');
+    const connectedActions = document.getElementById('connected-actions');
+    const toggleBtn = document.getElementById('toggle-btn');
+
+    if (data.connected) {
+      badge.textContent = data.enabled ? BL.active : BL.paused;
+      badge.className = `text-xs px-2 py-1 rounded-full ${data.enabled ? 'bg-green-900 text-green-300' : 'bg-yellow-900 text-yellow-300'}`;
+      details.innerHTML = `
+        <p><strong>Handle:</strong> @${data.handle}</p>
+        <p class="mt-1"><strong>DID:</strong> <code class="text-xs">${data.did}</code></p>
+        <p class="mt-1"><strong>Cross-posting:</strong> ${data.enabled ? 'New posts will appear on Bluesky' : 'Paused — new posts will not be cross-posted'}</p>
+      `;
+      connectForm.classList.add('hidden');
+      connectedActions.classList.remove('hidden');
+      toggleBtn.textContent = data.enabled ? BL.pauseCrosspost : BL.enableCrosspost;
+      toggleBtn.className = `flex-1 rounded px-4 py-2 text-sm font-medium transition ${data.enabled ? 'bg-yellow-700 hover:bg-yellow-600' : 'bg-green-700 hover:bg-green-600'}`;
+    } else {
+      badge.textContent = BL.notConnected;
+      badge.className = 'text-xs px-2 py-1 rounded-full bg-theme-surface-hover text-theme-text';
+      details.innerHTML = `<p>${BL.noAccount}</p>`;
+      connectForm.classList.remove('hidden');
+      connectedActions.classList.add('hidden');
+    }
+  }
+
+  // Connect form
+  document.getElementById('bsky-connect-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const handle = document.getElementById('bsky-handle').value.trim();
+    const appPassword = document.getElementById('bsky-password').value.trim();
+    const errorEl = document.getElementById('connect-error');
+    errorEl.classList.add('hidden');
+
+    if (!handle || !appPassword) {
+      errorEl.textContent = 'Both fields are required';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${hubUrl}/api/bluesky/connect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ handle, appPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errorEl.textContent = data.error || 'Connection failed';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+      // Clear cached session so social page re-fetches for new account
+      localStorage.removeItem(authStorageKey('ps_bsky_session'));
+      loadStatus();
+    } catch (err) {
+      errorEl.textContent = 'Network error';
+      errorEl.classList.remove('hidden');
+    }
+  });
+
+  // Toggle
+  document.getElementById('toggle-btn').addEventListener('click', async () => {
+    await fetch(`${hubUrl}/api/bluesky/toggle`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    loadStatus();
+  });
+
+  // Disconnect
+  document.getElementById('disconnect-btn').addEventListener('click', async () => {
+    if (!confirm('Disconnect your Bluesky account? Existing cross-posts will remain on Bluesky.')) return;
+    await fetch(`${hubUrl}/api/bluesky/disconnect`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    // Clear cached session so social page re-fetches (or shows logged-out state)
+    localStorage.removeItem(authStorageKey('ps_bsky_session'));
+    loadStatus();
+  });
+</script>

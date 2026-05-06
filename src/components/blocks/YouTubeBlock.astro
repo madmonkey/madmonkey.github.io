@@ -1,0 +1,27 @@
+---
+import YouTubePlayer from '../YouTubePlayer.jsx';
+import labels from '../../content/labels.json';
+
+const { url, heading, caption, audioOnly, display = 'docked', tracks, layout = 'contained', startTime, endTime, useNativeControls } = Astro.props;
+
+// Floating players are rendered separately in BaseLayout with transition:persist
+const isFloating = display === 'floating';
+const playerLabels = labels.player || {};
+---
+
+{!isFloating && (
+  <YouTubePlayer
+    client:visible
+    url={url}
+    heading={heading}
+    caption={caption}
+    audioOnly={audioOnly}
+    display="docked"
+    tracks={tracks}
+    layout={layout}
+    labels={playerLabels}
+    startTime={startTime}
+    endTime={endTime}
+    useNativeControls={useNativeControls}
+  />
+)}

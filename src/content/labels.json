@@ -1,0 +1,147 @@
+{
+  "player": {
+    "track": "Track",
+    "playlist": "Playlist",
+    "next": "Next",
+    "play": "Play",
+    "pause": "Pause",
+    "audioPlayer": "♫ Audio Player",
+    "previous": "Previous",
+    "youtubeVideo": "YouTube video",
+    "changePosition": "Change position",
+    "expand": "Expand player",
+    "videoPlayer": "▶ Player",
+    "minimize": "Minimize"
+  },
+  "settings": {
+    "heading": "Settings",
+    "rssFeeds": "RSS Feeds",
+    "bluesky": "Bluesky",
+    "signInPrompt": "Sign in to manage your settings",
+    "signInButton": "Sign in with GitHub"
+  },
+  "nav": {
+    "posts": "Posts",
+    "galleries": "Galleries",
+    "social": "Social",
+    "settings": "Settings",
+    "about": "About",
+    "signIn": "Sign In",
+    "rss": "RSS"
+  },
+  "bluesky": {
+    "heading": "Bluesky Integration",
+    "active": "Active",
+    "pauseCrosspost": "Pause Cross-posting",
+    "noAccount": "No Bluesky account connected.",
+    "handleLabel": "Bluesky Handle",
+    "paused": "Paused",
+    "connectionStatus": "Connection Status",
+    "notConnected": "Not Connected",
+    "connectHeading": "Connect Bluesky",
+    "passwordLabel": "App Password",
+    "connectButton": "Connect Bluesky Account",
+    "enableCrosspost": "Enable Cross-posting"
+  },
+  "social": {
+    "heading": "Social Feed",
+    "tabFeed": "Feed",
+    "tabDiscover": "Discover",
+    "tabSquads": "Squads",
+    "tabSearch": "Search",
+    "tabYouTube": "Video",
+    "tabPosts": "Posts",
+    "tabTimeline": "Timeline",
+    "signInPrompt": "Sign in to see your feed",
+    "noUsers": "No users yet",
+    "readButton": "↗ Read",
+    "shareButton": "↗ Share",
+    "noPosts": "No posts yet",
+    "signInButton": "Sign in with GitHub",
+    "viewButton": "↗ View",
+    "loading": "Loading...",
+    "connectBluesky": "Connect your Bluesky account in Settings to see your feed",
+    "failedToLoad": "Failed to load feed"
+  },
+  "about": {
+    "heading": "About This Site"
+  },
+  "galleries": {
+    "heading": "Photo Galleries",
+    "allPhotos": "All Photos",
+    "gallery": "Gallery"
+  },
+  "posts": {
+    "heading": "All Posts"
+  },
+  "feeds": {
+    "heading": "External RSS Feeds",
+    "addFeed": "Add Feed",
+    "tabMyFeeds": "My Feeds",
+    "tabAllPosts": "All Posts",
+    "backToFeeds": "← Back to feeds",
+    "noFeeds": "No feeds yet. Add one above!",
+    "loadMore": "Load More",
+    "adding": "Adding..."
+  },
+  "components": {
+    "viewOnBluesky": "View on Bluesky ↗",
+    "iso": "ISO",
+    "camera": "Camera",
+    "focalLength": "Focal Length",
+    "aperture": "Aperture",
+    "postButton": "Post",
+    "commentPlaceholder": "Write a comment...",
+    "comments": "Comments",
+    "dateTaken": "Date Taken",
+    "shutterSpeed": "Shutter Speed",
+    "exifData": "EXIF Data",
+    "lens": "Lens",
+    "share": "↗ Share"
+  },
+  "squads": {
+    "heading": "Squads",
+    "signInPrompt": "Sign in and connect Bluesky to use Squads",
+    "placeholder": "Squad name (e.g. Photo Friends)",
+    "createButton": "Create Squad",
+    "deleteButton": "Delete",
+    "viewFeed": "View Squad Feed",
+    "hideFeed": "Hide Squad Feed",
+    "noPosts": "No posts"
+  },
+  "footer": {
+    "poweredBy": "Powered by Pirate Social"
+  },
+  "navItems": [
+    {
+      "label": "Posts",
+      "url": "/posts",
+      "visible": false
+    },
+    {
+      "label": "Galleries",
+      "url": "/galleries",
+      "visible": false
+    },
+    {
+      "label": "Social",
+      "url": "/social",
+      "visible": true
+    },
+    {
+      "label": "Settings",
+      "url": "/settings",
+      "visible": true
+    },
+    {
+      "label": "About",
+      "url": "/about",
+      "visible": false
+    }
+  ],
+  "home": {
+    "recentPhotos": "Recent",
+    "viewAllPosts": "View all posts →"
+  },
+  "showSignIn": true
+}

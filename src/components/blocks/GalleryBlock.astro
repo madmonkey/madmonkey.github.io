@@ -1,0 +1,36 @@
+---
+import { withBase } from '../../lib/config';
+
+const { heading, columns = '3', images = [] } = Astro.props;
+
+const gridCols = {
+  '2': 'sm:grid-cols-2',
+  '3': 'sm:grid-cols-2 lg:grid-cols-3',
+  '4': 'sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
+}[columns] || 'sm:grid-cols-2 lg:grid-cols-3';
+
+const galleryId = `gallery-${Math.random().toString(36).slice(2, 8)}`;
+---
+
+<section class="mb-12">
+  {heading && <h2 class="mb-6 text-xl font-semibold">{heading}</h2>}
+  <div class={`grid grid-cols-1 gap-4 ${gridCols}`}>
+    {(images as any[]).map((img, i) => (
+      <a
+        href={withBase(img.src)}
+        class="glightbox group block overflow-hidden rounded-lg"
+        data-gallery={galleryId}
+        data-description={img.caption || ''}
+      >
+        <div class="aspect-square overflow-hidden">
+          <img
+            src={withBase(img.src)}
+            alt={img.alt || img.caption || ''}
+            class="h-full w-full object-cover transition group-hover:scale-105"
+            loading="lazy"
+          />
+        </div>
+      </a>
+    ))}
+  </div>
+</section>

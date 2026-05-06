@@ -1,0 +1,59 @@
+---
+/**
+ * Reusable CTA links renderer.
+ * Used by CtaBlock (standalone) and HeroBlock (embedded).
+ *
+ * Props:
+ *   links: Array<{ label, url, style, openInNewTab }>
+ *   align: 'left' | 'center' | 'right'
+ *   onDark: boolean — use light text for dark backgrounds (hero overlays)
+ */
+import { withBase } from '../../lib/config';
+
+interface CtaLink {
+  label: string;
+  url: string;
+  style?: 'primary' | 'secondary' | 'outline' | 'text';
+  openInNewTab?: boolean;
+}
+
+const { links = [], align = 'center', onDark = false } = Astro.props as {
+  links: CtaLink[];
+  align?: string;
+  onDark?: boolean;
+};
+
+const alignClass: Record<string, string> = {
+  left: 'justify-start',
+  center: 'justify-center',
+  right: 'justify-end',
+};
+---
+
+{links.length > 0 && (
+  <div class={`flex flex-wrap gap-3 ${alignClass[align] || 'justify-center'}`}>
+    {links.map((link) => {
+      const href = link.url.startsWith('/') ? withBase(link.url) : link.url;
+      const target = link.openInNewTab ? '_blank' : undefined;
+      const rel = link.openInNewTab ? 'noopener noreferrer' : undefined;
+      const style = link.style || 'primary';
+
+      return style === 'text' ? (
+        <a href={href} target={target} rel={rel}
+          class={`text-sm font-medium underline underline-offset-4 transition hover:opacity-80 ${onDark ? 'text-white' : 'text-theme-primary'}`}>
+          {link.label}
+        </a>
+      ) : (
+        <a href={href} target={target} rel={rel}
+          class:list={[
+            'inline-flex items-center rounded-md px-5 py-2.5 text-sm font-medium transition',
+            style === 'primary' && 'bg-theme-primary text-white hover:opacity-90',
+            style === 'secondary' && `${onDark ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-theme-surface text-theme-text hover:bg-theme-surface-hover'}`,
+            style === 'outline' && `border-2 ${onDark ? 'border-white text-white hover:bg-white/10' : 'border-theme-primary text-theme-primary hover:bg-theme-primary/10'}`,
+          ]}>
+          {link.label}
+        </a>
+      );
+    })}
+  </div>
+)}

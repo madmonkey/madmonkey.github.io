@@ -1,0 +1,20 @@
+{
+  "title": "Start Here",
+  "slug": "start-here",
+  "description": "How to customize your new Pirate Social site",
+  "showInNav": true,
+  "blocks": [
+    {
+      "type": "hero",
+      "heading": "How To Set Up Your Site",
+      "subheading": "Use this sample page as a guide, then replace it with your own content.",
+      "align": "left",
+      "showAvatar": false
+    },
+    {
+      "type": "text",
+      "layout": "narrow",
+      "body": "## 1) Edit this page\n\nOpen **/admin** and go to **Pages -> Start Here**.\n\nYou can add, remove, and reorder blocks to build custom pages.\n\n## 2) Publish your first post\n\nGo to **Posts** in the CMS and create a new post with a title, publish date, and content.\n\n## 3) Configure your profile\n\nOpen **Settings** to set your site title, description, avatar, and social options.\n\n## 4) Remove sample content\n\nWhen you're ready, delete this page and the sample post from the CMS."
+    }
+  ]
+}

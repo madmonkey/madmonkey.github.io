@@ -1,0 +1,831 @@
+backend:
+  name: github
+  repo: your-username/your-repo
+  branch: main
+  base_url: https://piratesocial.app
+  auth_endpoint: /api/decap/auth
+
+site_url: https://example.com
+display_url: https://example.com
+
+logo_url: /images/logoImage.svg
+
+media_folder: public/images
+public_folder: /images
+
+collections:
+  - name: posts
+    label: Posts
+    folder: src/content/posts
+    create: true
+    path: "{{slug}}/index"
+    media_folder: ""
+    public_folder: ""
+    slug: "{{slug}}"
+    extension: md
+    fields:
+      - { label: Title, name: title, widget: string }
+      - { label: Description, name: description, widget: text, required: false }
+      - { label: Publish Date, name: pubDate, widget: datetime }
+      - { label: Featured Image, name: image, widget: image, required: false }
+      - { label: Image Alt Text, name: imageAlt, widget: string, required: false }
+      - label: Tags
+        name: tags
+        widget: list
+        default: []
+      - { label: Draft, name: draft, widget: boolean, default: false }
+      - label: Visibility
+        name: visibility
+        widget: select
+        options:
+          - { label: "Site Only (no social)", value: site }
+          - { label: "Site + Social (crosspost to Bluesky)", value: social }
+          - { label: "Private (password protected)", value: private }
+        default: site
+        hint: "Site Only = never crosspost. Site + Social = auto-post to Bluesky. Private = password required to view."
+      - label: "Private Password"
+        name: privatePassword
+        widget: string
+        required: false
+        pattern: ['[A-Za-z0-9]{3,6}', 'Must be 3-6 alphanumeric characters']
+        hint: "Set only if Visibility is Private. Users will need this to view the post."
+      - label: EXIF Data
+        name: exif
+        widget: object
+        required: false
+        collapsed: true
+        fields:
+          - { label: Camera, name: camera, widget: string, required: false }
+          - { label: Lens, name: lens, widget: string, required: false }
+          - { label: Focal Length, name: focalLength, widget: string, required: false }
+          - { label: Aperture, name: aperture, widget: string, required: false }
+          - { label: Shutter Speed, name: shutterSpeed, widget: string, required: false }
+          - { label: ISO, name: iso, widget: string, required: false }
+          - { label: Date Taken, name: dateTaken, widget: string, required: false }
+      - label: Gallery
+        name: gallery
+        widget: list
+        required: false
+        fields:
+          - { label: Image, name: src, widget: image }
+          - { label: Alt Text, name: alt, widget: string, required: false }
+          - { label: Caption, name: caption, widget: string, required: false }
+      - { label: Body, name: body, widget: markdown, required: false }
+
+  - name: galleries
+    label: Galleries
+    folder: src/content/galleries
+    create: true
+    path: "{{slug}}/index"
+    media_folder: ""
+    public_folder: ""
+    slug: "{{slug}}"
+    extension: md
+    fields:
+      - { label: Title, name: title, widget: string }
+      - { label: Description, name: description, widget: text, required: false }
+      - { label: Publish Date, name: pubDate, widget: datetime }
+      - { label: Cover Image, name: coverImage, widget: image, required: false }
+      - label: Tags
+        name: tags
+        widget: list
+        default: []
+      - label: Slideshow Style
+        name: slideshowStyle
+        widget: select
+        options: ["fade", "slide", "zoom"]
+        default: fade
+      - label: Slideshow Interval (seconds, 0 for manual)
+        name: slideshowInterval
+        widget: number
+        default: 0
+      - label: Photos
+        name: photos
+        widget: list
+        fields:
+          - { label: Image, name: src, widget: image }
+          - { label: Alt Text, name: alt, widget: string, required: false }
+          - { label: Caption, name: caption, widget: string, required: false }
+      - { label: Body, name: body, widget: markdown }
+
+  - name: pages
+    label: Pages
+    label_singular: Page
+    folder: src/content/pages
+    create: true
+    format: json
+    slug: "{{slug}}"
+    description: "Create custom pages with drag-and-drop content blocks"
+    fields:
+      - { label: "Title", name: title, widget: string }
+      - { label: "URL Slug", name: slug, widget: string, hint: "The URL path for this page (e.g. 'contact' → /contact)" }
+      - { label: "Description", name: description, widget: text, required: false, hint: "Used for SEO meta description" }
+      - { label: "Show in Navigation", name: showInNav, widget: boolean, default: false, hint: "Automatically add this page to the site navigation" }
+      - label: "Content Blocks"
+        name: blocks
+        widget: list
+        hint: "Drag to reorder blocks. Click 'Add' to insert new content modules."
+        types:
+          - label: "Hero Banner"
+            name: hero
+            widget: object
+            fields:
+              - { label: "Heading", name: heading, widget: string, required: false }
+              - { label: "Subheading", name: subheading, widget: text, required: false }
+              - { label: "Background Image", name: image, widget: image, required: false }
+              - { label: "Dark Overlay", name: overlay, widget: boolean, default: true, hint: "Add a dark gradient over the image for text readability" }
+              - label: "Height"
+                name: height
+                widget: select
+                options:
+                  - { label: "Small (40vh)", value: "small" }
+                  - { label: "Medium (60vh)", value: "medium" }
+                  - { label: "Large (80vh)", value: "large" }
+                  - { label: "Full Screen", value: "full" }
+                default: "medium"
+              - label: "Links / Buttons"
+                name: links
+                widget: list
+                required: false
+                hint: "Add buttons or links to the hero banner"
+                fields:
+                  - { label: "Label", name: label, widget: string }
+                  - { label: "URL", name: url, widget: string }
+                  - label: "Style"
+                    name: style
+                    widget: select
+                    options:
+                      - { label: "Primary Button", value: "primary" }
+                      - { label: "Secondary Button", value: "secondary" }
+                      - { label: "Outline Button", value: "outline" }
+                      - { label: "Text Link", value: "text" }
+                    default: "primary"
+                  - { label: "Open in New Tab", name: openInNewTab, widget: boolean, default: false }
+
+          - label: "Profile Card"
+            name: profile
+            widget: object
+            fields:
+              - label: "Layout"
+                name: layout
+                widget: select
+                options:
+                  - { label: "Centered", value: "center" }
+                  - { label: "Side by Side", value: "row" }
+                  - { label: "Card", value: "card" }
+                default: "center"
+
+          - label: "Recent Posts"
+            name: recentPosts
+            widget: object
+            fields:
+              - { label: "Heading", name: heading, widget: string, default: "Recent" }
+              - { label: "Post Count", name: count, widget: number, default: 6, value_type: int, min: 1, max: 24 }
+              - label: "Columns"
+                name: columns
+                widget: select
+                options:
+                  - { label: "2 Columns", value: "2" }
+                  - { label: "3 Columns", value: "3" }
+                  - { label: "4 Columns", value: "4" }
+                default: "3"
+
+          - label: "YouTube Video"
+            name: youtube
+            widget: object
+            fields:
+              - { label: "YouTube URL", name: url, widget: string, hint: "Paste a YouTube video URL" }
+              - { label: "Title", name: heading, widget: string, required: false }
+              - { label: "Caption", name: caption, widget: text, required: false }
+              - label: "Display"
+                name: display
+                widget: select
+                options:
+                  - { label: "Docked (inline on page)", value: "docked" }
+                  - { label: "Floating (mini player)", value: "floating" }
+                default: "docked"
+                hint: "Floating player persists across pages and can be minimized"
+              - { label: "Audio Only", name: audioOnly, widget: boolean, default: false, hint: "Hide video, play audio only" }
+              - { label: "Start Time (seconds)", name: startTime, widget: number, required: false, value_type: int, min: 0, hint: "Start playback at this time (in seconds). Leave blank to start from beginning." }
+              - { label: "End Time (seconds)", name: endTime, widget: number, required: false, value_type: int, min: 0, hint: "Stop playback at this time (in seconds). Leave blank to play to end." }
+              - label: "Additional Tracks"
+                name: tracks
+                widget: list
+                required: false
+                hint: "Add more tracks to create a playlist"
+                fields:
+                  - { label: "YouTube URL", name: url, widget: string }
+                  - { label: "Title", name: title, widget: string, required: false }
+                  - { label: "Start Time (seconds)", name: startTime, widget: number, required: false, value_type: int, min: 0, hint: "Start playback at this time (in seconds)" }
+                  - { label: "End Time (seconds)", name: endTime, widget: number, required: false, value_type: int, min: 0, hint: "Stop playback at this time (in seconds)" }
+              - label: "Layout"
+                name: layout
+                widget: select
+                options:
+                  - { label: "Full Width", value: "full" }
+                  - { label: "Contained", value: "contained" }
+                default: "contained"
+
+          - label: "Photo Gallery"
+            name: gallery
+            widget: object
+            fields:
+              - { label: "Heading", name: heading, widget: string, required: false }
+              - label: "Columns"
+                name: columns
+                widget: select
+                options:
+                  - { label: "2 Columns", value: "2" }
+                  - { label: "3 Columns", value: "3" }
+                  - { label: "4 Columns", value: "4" }
+                default: "3"
+              - label: "Photos"
+                name: images
+                widget: list
+                fields:
+                  - { label: "Image", name: src, widget: image }
+                  - { label: "Alt Text", name: alt, widget: string, required: false }
+                  - { label: "Caption", name: caption, widget: string, required: false }
+
+          - label: "Text / Markdown"
+            name: text
+            widget: object
+            fields:
+              - { label: "Heading", name: heading, widget: string, required: false }
+              - { label: "Body", name: body, widget: markdown }
+              - label: "Layout"
+                name: layout
+                widget: select
+                options:
+                  - { label: "Full Width", value: "full" }
+                  - { label: "Narrow (centered)", value: "narrow" }
+                default: "narrow"
+
+          - label: "Image"
+            name: image
+            widget: object
+            fields:
+              - { label: "Image", name: src, widget: image }
+              - { label: "Alt Text", name: alt, widget: string, required: false }
+              - { label: "Caption", name: caption, widget: string, required: false }
+              - { label: "Lightbox", name: lightbox, widget: boolean, default: true, hint: "Click to open full-screen" }
+              - label: "Layout"
+                name: layout
+                widget: select
+                options:
+                  - { label: "Full Width", value: "full" }
+                  - { label: "Contained", value: "contained" }
+                  - { label: "Banner (short & wide)", value: "banner" }
+                default: "contained"
+
+          - label: "Location"
+            name: location
+            widget: object
+            fields:
+              - { label: "Heading", name: heading, widget: string, default: "Location" }
+              - { label: "Address / Description", name: address, widget: text, required: false }
+              - { label: "Map Embed URL", name: mapUrl, widget: string, required: false, hint: "Google Maps embed URL (from Share > Embed a map > copy the src URL)" }
+
+          - label: "FAQ"
+            name: faq
+            widget: object
+            fields:
+              - { label: "Heading", name: heading, widget: string, required: false, default: "Frequently Asked Questions" }
+              - { label: "Description", name: description, widget: text, required: false, hint: "Optional intro text above the FAQ items" }
+              - label: "Layout"
+                name: layout
+                widget: select
+                options:
+                  - { label: "Narrow (centered)", value: "narrow" }
+                  - { label: "Full Width", value: "full" }
+                default: "narrow"
+              - label: "Questions"
+                name: items
+                widget: list
+                fields:
+                  - { label: "Question", name: question, widget: string }
+                  - { label: "Answer", name: answer, widget: markdown }
+
+          - label: "Call to Action"
+            name: cta
+            widget: object
+            fields:
+              - { label: "Heading", name: heading, widget: string, required: false }
+              - { label: "Description", name: description, widget: text, required: false }
+              - label: "Alignment"
+                name: align
+                widget: select
+                options:
+                  - { label: "Left", value: "left" }
+                  - { label: "Center", value: "center" }
+                  - { label: "Right", value: "right" }
+                default: "center"
+              - label: "Layout"
+                name: layout
+                widget: select
+                options:
+                  - { label: "Narrow (centered)", value: "narrow" }
+                  - { label: "Full Width", value: "full" }
+                default: "narrow"
+              - label: "Links / Buttons"
+                name: links
+                widget: list
+                fields:
+                  - { label: "Label", name: label, widget: string }
+                  - { label: "URL", name: url, widget: string }
+                  - label: "Style"
+                    name: style
+                    widget: select
+                    options:
+                      - { label: "Primary Button", value: "primary" }
+                      - { label: "Secondary Button", value: "secondary" }
+                      - { label: "Outline Button", value: "outline" }
+                      - { label: "Text Link", value: "text" }
+                    default: "primary"
+                  - { label: "Open in New Tab", name: openInNewTab, widget: boolean, default: false }
+
+          - label: "Galleries List"
+            name: galleriesList
+            widget: object
+            fields:
+              - { label: "Heading", name: heading, widget: string, required: false, hint: "Optional section heading above the gallery grid" }
+              - label: "Columns"
+                name: columns
+                widget: select
+                options:
+                  - { label: "2 Columns", value: "2" }
+                  - { label: "3 Columns", value: "3" }
+                  - { label: "4 Columns", value: "4" }
+                default: "3"
+
+  - name: site-settings
+    label: Site Settings
+    files:
+      - label: Configuration
+        name: config
+        file: src/content/settings.json
+        fields:
+          - label: "Enable Social Features"
+            name: enableSocial
+            widget: boolean
+            default: true
+            hint: "When OFF, hides the Social page, Settings pages, Sign In button, and social actions on posts. The site becomes a standalone photo blog."
+          - label: "Navigation Style"
+            name: navStyle
+            widget: select
+            default: "float"
+            options:
+              - { label: "Top bar (default)", value: "top" }
+              - { label: "Floating menu button", value: "float" }
+            hint: "Top bar shows all nav links in the header. Floating hides the nav items and shows a hamburger button at the bottom center of the screen that opens a slide-up panel."
+          - label: "Show Dates"
+            name: showDates
+            widget: boolean
+            default: true
+            hint: "When OFF, hides date stamps on posts and galleries throughout the site"
+          - { label: Site Title, name: title, widget: string }
+          - { label: Description, name: description, widget: text }
+          - { label: Author Name, name: author, widget: string }
+          - { label: Bio, name: bio, widget: text }
+          - { label: Avatar, name: avatar, widget: image }
+          - { label: Location, name: location, widget: string, required: false }
+          - { label: Camera, name: camera, widget: string, required: false }
+          - label: "Site Logo"
+            name: logo
+            widget: object
+            collapsed: false
+            fields:
+              - label: "Logo Type"
+                name: type
+                widget: select
+                options:
+                  - { label: "Image", value: "image" }
+                  - { label: "Text", value: "text" }
+                default: "image"
+                hint: "Choose whether to show an image or text in the header"
+              - { label: "Logo Image", name: image, widget: image, default: "/images/logoImage.svg", required: false, hint: "Used when Logo Type is 'Image'" }
+              - { label: "Logo Text", name: text, widget: string, required: false, hint: "Used when Logo Type is 'Text' (e.g. your site name)" }
+          - label: "Cloudinary Media Library"
+            name: cloudinary
+            widget: object
+            collapsed: true
+            hint: "Optional: use Cloudinary CDN for browsable media folders instead of storing images in your repo. Get your credentials at cloudinary.com/console"
+            fields:
+              - label: "Enable Cloudinary"
+                name: enabled
+                widget: boolean
+                default: false
+                hint: "When ON, all media uploads go to Cloudinary CDN instead of your Git repo"
+              - { label: "Cloud Name", name: cloudName, widget: string, required: false, hint: "Found in your Cloudinary dashboard (e.g. 'my-site-abc123')" }
+              - { label: "API Key", name: apiKey, widget: string, required: false, hint: "From Cloudinary > Settings > API Keys. This is safe to store — it is not your secret key." }
+
+      - label: PWA & Open Graph
+        name: pwa
+        file: src/content/pwa.json
+        fields:
+          - label: "Search Engine Visibility"
+            name: searchEngineVisibility
+            widget: boolean
+            default: true
+            hint: "When OFF, search engines like Google will be asked not to index your site (adds noindex/nofollow)"
+          - { label: "App Name", name: name, widget: string, default: "Pirate Social", hint: "Full name shown in app install prompts and splash screens" }
+          - { label: "Short Name", name: shortName, widget: string, default: "Pirate", hint: "Shown on the home screen icon (keep under 12 chars)" }
+          - { label: "App Description", name: description, widget: text, default: "A photography site on the Pirate Social network", hint: "Shown in app store listings and install prompts" }
+          - label: "Start URL"
+            name: startUrl
+            widget: string
+            default: "/"
+            hint: "The page that opens when the PWA is launched"
+          - label: "Display Mode"
+            name: display
+            widget: select
+            options:
+              - { label: "Standalone (app-like, no browser bar)", value: "standalone" }
+              - { label: "Fullscreen", value: "fullscreen" }
+              - { label: "Minimal UI (small browser bar)", value: "minimal-ui" }
+              - { label: "Browser (normal tab)", value: "browser" }
+            default: "standalone"
+          - { label: "Background Color", name: backgroundColor, widget: color, enableAlpha: false, default: "#09090b", hint: "Splash screen background color" }
+          - { label: "Theme Color", name: themeColor, widget: color, enableAlpha: false, default: "#09090b", hint: "Browser toolbar and status bar color" }
+          - { label: "Icon 192×192", name: icon192, widget: image, default: "/images/icon192.png", hint: "Used for home screen icon and small displays" }
+          - { label: "Icon 512×512", name: icon512, widget: image, default: "/images/icon512.png", hint: "Used for splash screens and app store listings" }
+          - { label: "Screenshot", name: screenshot, widget: image, required: false, default: "/images/screenshot.png", hint: "App preview image (1280×720 recommended)" }
+          - { label: "Default OG Image", name: ogImage, widget: image, default: "/images/icon512.png", hint: "Fallback image for social media sharing when a page has no image" }
+          - { label: "OG Title Override", name: ogTitle, widget: string, required: false, hint: "Override the default Open Graph title (leave blank to use site title)" }
+          - { label: "OG Description Override", name: ogDescription, widget: text, required: false, hint: "Override the default OG description (leave blank to use site description)" }
+          - { label: "Favicon", name: favicon, widget: image, default: "/images/logoImage.svg", hint: "Browser tab icon (SVG or PNG)" }
+          - { label: "Apple Touch Icon", name: appleTouchIcon, widget: image, default: "/images/icon192.png", hint: "Icon for iOS home screen bookmark" }
+
+      - label: Theme
+        name: theme
+        file: src/content/theme.json
+        fields:
+          - label: "Background Image"
+            name: backgroundImage
+            widget: object
+            collapsed: false
+            fields:
+              - { label: "Image", name: url, widget: image, required: false, hint: "Upload a background image for the site body" }
+              - label: "Size"
+                name: size
+                widget: select
+                options:
+                  - { label: "Cover (fill screen, may crop)", value: "cover" }
+                  - { label: "Contain (fit entirely, may leave gaps)", value: "contain" }
+                  - { label: "Fill (stretch to fit)", value: "100% 100%" }
+                  - { label: "Auto (natural size)", value: "auto" }
+                default: "cover"
+              - label: "Position"
+                name: position
+                widget: select
+                options:
+                  - { label: "Center", value: "center center" }
+                  - { label: "Top", value: "center top" }
+                  - { label: "Bottom", value: "center bottom" }
+                  - { label: "Left", value: "left center" }
+                  - { label: "Right", value: "right center" }
+                  - { label: "Top Left", value: "left top" }
+                  - { label: "Top Right", value: "right top" }
+                  - { label: "Bottom Left", value: "left bottom" }
+                  - { label: "Bottom Right", value: "right bottom" }
+                default: "center center"
+              - label: "Scroll Behavior"
+                name: attachment
+                widget: select
+                options:
+                  - { label: "Fixed (stays in place while scrolling)", value: "fixed" }
+                  - { label: "Scroll (moves with content)", value: "scroll" }
+                default: "fixed"
+              - label: "Blur Amount (px)"
+                name: blur
+                widget: select
+                options:
+                  - { label: "None", value: "0" }
+                  - { label: "Slight (2px)", value: "2" }
+                  - { label: "Light (4px)", value: "4" }
+                  - { label: "Medium (8px)", value: "8" }
+                  - { label: "Heavy (16px)", value: "16" }
+                  - { label: "Extreme (32px)", value: "32" }
+                default: "0"
+
+          - label: Fonts
+            name: fonts
+            widget: object
+            collapsed: false
+            fields:
+              - label: Heading Font
+                name: heading
+                widget: select
+                options:
+                  - { label: "System Default", value: "system-ui, -apple-system, sans-serif" }
+                  - { label: "Inter", value: "'Inter', sans-serif" }
+                  - { label: "Roboto", value: "'Roboto', sans-serif" }
+                  - { label: "Open Sans", value: "'Open Sans', sans-serif" }
+                  - { label: "Lato", value: "'Lato', sans-serif" }
+                  - { label: "Montserrat", value: "'Montserrat', sans-serif" }
+                  - { label: "Poppins", value: "'Poppins', sans-serif" }
+                  - { label: "Nunito", value: "'Nunito', sans-serif" }
+                  - { label: "Raleway", value: "'Raleway', sans-serif" }
+                  - { label: "Work Sans", value: "'Work Sans', sans-serif" }
+                  - { label: "DM Sans", value: "'DM Sans', sans-serif" }
+                  - { label: "Source Sans 3", value: "'Source Sans 3', sans-serif" }
+                  - { label: "Outfit", value: "'Outfit', sans-serif" }
+                  - { label: "Plus Jakarta Sans", value: "'Plus Jakarta Sans', sans-serif" }
+                  - { label: "Space Grotesk", value: "'Space Grotesk', sans-serif" }
+                  - { label: "Manrope", value: "'Manrope', sans-serif" }
+                  - { label: "Figtree", value: "'Figtree', sans-serif" }
+                  - { label: "Rubik", value: "'Rubik', sans-serif" }
+                  - { label: "Karla", value: "'Karla', sans-serif" }
+                  - { label: "Barlow", value: "'Barlow', sans-serif" }
+                  - { label: "Jost", value: "'Jost', sans-serif" }
+                  - { label: "Merriweather", value: "'Merriweather', serif" }
+                  - { label: "Playfair Display", value: "'Playfair Display', serif" }
+                  - { label: "Lora", value: "'Lora', serif" }
+                  - { label: "Libre Baskerville", value: "'Libre Baskerville', serif" }
+                  - { label: "Crimson Text", value: "'Crimson Text', serif" }
+                  - { label: "Source Serif 4", value: "'Source Serif 4', serif" }
+                  - { label: "Cormorant Garamond", value: "'Cormorant Garamond', serif" }
+                  - { label: "EB Garamond", value: "'EB Garamond', serif" }
+                  - { label: "Bitter", value: "'Bitter', serif" }
+                  - { label: "Noto Serif", value: "'Noto Serif', serif" }
+                  - { label: "Oswald", value: "'Oswald', sans-serif" }
+                  - { label: "Bebas Neue", value: "'Bebas Neue', sans-serif" }
+                  - { label: "Abril Fatface", value: "'Abril Fatface', serif" }
+                default: "system-ui, -apple-system, sans-serif"
+              - label: Body Font
+                name: body
+                widget: select
+                options:
+                  - { label: "System Default", value: "system-ui, -apple-system, sans-serif" }
+                  - { label: "Inter", value: "'Inter', sans-serif" }
+                  - { label: "Roboto", value: "'Roboto', sans-serif" }
+                  - { label: "Open Sans", value: "'Open Sans', sans-serif" }
+                  - { label: "Lato", value: "'Lato', sans-serif" }
+                  - { label: "Montserrat", value: "'Montserrat', sans-serif" }
+                  - { label: "Poppins", value: "'Poppins', sans-serif" }
+                  - { label: "Nunito", value: "'Nunito', sans-serif" }
+                  - { label: "Raleway", value: "'Raleway', sans-serif" }
+                  - { label: "Work Sans", value: "'Work Sans', sans-serif" }
+                  - { label: "DM Sans", value: "'DM Sans', sans-serif" }
+                  - { label: "Source Sans 3", value: "'Source Sans 3', sans-serif" }
+                  - { label: "Outfit", value: "'Outfit', sans-serif" }
+                  - { label: "Plus Jakarta Sans", value: "'Plus Jakarta Sans', sans-serif" }
+                  - { label: "Space Grotesk", value: "'Space Grotesk', sans-serif" }
+                  - { label: "Manrope", value: "'Manrope', sans-serif" }
+                  - { label: "Figtree", value: "'Figtree', sans-serif" }
+                  - { label: "Rubik", value: "'Rubik', sans-serif" }
+                  - { label: "Karla", value: "'Karla', sans-serif" }
+                  - { label: "Barlow", value: "'Barlow', sans-serif" }
+                  - { label: "Jost", value: "'Jost', sans-serif" }
+                  - { label: "Merriweather", value: "'Merriweather', serif" }
+                  - { label: "Playfair Display", value: "'Playfair Display', serif" }
+                  - { label: "Lora", value: "'Lora', serif" }
+                  - { label: "Libre Baskerville", value: "'Libre Baskerville', serif" }
+                  - { label: "Crimson Text", value: "'Crimson Text', serif" }
+                  - { label: "Source Serif 4", value: "'Source Serif 4', serif" }
+                  - { label: "Cormorant Garamond", value: "'Cormorant Garamond', serif" }
+                  - { label: "EB Garamond", value: "'EB Garamond', serif" }
+                  - { label: "Bitter", value: "'Bitter', serif" }
+                  - { label: "Noto Serif", value: "'Noto Serif', serif" }
+                default: "system-ui, -apple-system, sans-serif"
+              - label: Monospace Font
+                name: mono
+                widget: select
+                options:
+                  - { label: "System Mono", value: "ui-monospace, monospace" }
+                  - { label: "JetBrains Mono", value: "'JetBrains Mono', monospace" }
+                  - { label: "Fira Code", value: "'Fira Code', monospace" }
+                  - { label: "Source Code Pro", value: "'Source Code Pro', monospace" }
+                  - { label: "IBM Plex Mono", value: "'IBM Plex Mono', monospace" }
+                  - { label: "Space Mono", value: "'Space Mono', monospace" }
+                default: "ui-monospace, monospace"
+              - label: "Heading Size Scale (0.8 = smaller, 1 = default, 1.3 = larger)"
+                name: headingSize
+                widget: string
+                default: "1"
+              - label: "Body Size Scale (0.8 = smaller, 1 = default, 1.2 = larger)"
+                name: bodySize
+                widget: string
+                default: "1"
+
+          - label: "Light Mode Colors"
+            name: light
+            widget: object
+            collapsed: false
+            fields:
+              - { label: "Background", name: background, widget: color, enableAlpha: true, default: "rgba(255, 255, 255, 1)" }
+              - { label: "Surface (cards)", name: surface, widget: color, enableAlpha: true, default: "rgba(255, 255, 255, 1)" }
+              - { label: "Surface Border", name: surfaceBorder, widget: color, enableAlpha: true, default: "rgba(228, 228, 231, 1)" }
+              - { label: "Surface Hover", name: surfaceHover, widget: color, enableAlpha: true, default: "rgba(244, 244, 245, 1)" }
+              - { label: "Text", name: text, widget: color, enableAlpha: true, default: "rgba(24, 24, 27, 1)" }
+              - { label: "Text Muted", name: textMuted, widget: color, enableAlpha: true, default: "rgba(82, 82, 91, 1)" }
+              - { label: "Text Faint", name: textFaint, widget: color, enableAlpha: true, default: "rgba(113, 113, 122, 1)" }
+              - { label: "Primary (links, buttons)", name: primary, widget: color, enableAlpha: true, default: "rgba(59, 130, 246, 1)" }
+              - { label: "Primary Hover", name: primaryHover, widget: color, enableAlpha: true, default: "rgba(37, 99, 235, 1)" }
+              - { label: "Accent", name: accent, widget: color, enableAlpha: true, default: "rgba(139, 92, 246, 1)" }
+              - { label: "Border", name: border, widget: color, enableAlpha: true, default: "rgba(228, 228, 231, 1)" }
+              - { label: "Input Background", name: inputBg, widget: color, enableAlpha: true, default: "rgba(244, 244, 245, 1)" }
+              - { label: "Input Border", name: inputBorder, widget: color, enableAlpha: true, default: "rgba(212, 212, 216, 1)" }
+              - { label: "Tag Background", name: tag, widget: color, enableAlpha: true, default: "rgba(244, 244, 245, 1)" }
+              - { label: "Tag Text", name: tagText, widget: color, enableAlpha: true, default: "rgba(82, 82, 91, 1)" }
+              - { label: "Card Background", name: cardBg, widget: color, enableAlpha: true, default: "rgba(255, 255, 255, 1)" }
+              - { label: "Card Border", name: cardBorder, widget: color, enableAlpha: true, default: "rgba(228, 228, 231, 1)" }
+              - { label: "Card Hover Border", name: cardHover, widget: color, enableAlpha: true, default: "rgba(212, 212, 216, 1)" }
+              - { label: "Header Background", name: headerBg, widget: color, enableAlpha: true, default: "rgba(255, 255, 255, 1)" }
+              - { label: "Footer Background", name: footerBg, widget: color, enableAlpha: true, default: "rgba(255, 255, 255, 1)" }
+
+          - label: "Dark Mode Colors"
+            name: dark
+            widget: object
+            collapsed: false
+            fields:
+              - { label: "Background", name: background, widget: color, enableAlpha: true, default: "rgba(9, 9, 11, 1)" }
+              - { label: "Surface (cards)", name: surface, widget: color, enableAlpha: true, default: "rgba(24, 24, 27, 1)" }
+              - { label: "Surface Border", name: surfaceBorder, widget: color, enableAlpha: true, default: "rgba(39, 39, 42, 1)" }
+              - { label: "Surface Hover", name: surfaceHover, widget: color, enableAlpha: true, default: "rgba(39, 39, 42, 1)" }
+              - { label: "Text", name: text, widget: color, enableAlpha: true, default: "rgba(244, 244, 245, 1)" }
+              - { label: "Text Muted", name: textMuted, widget: color, enableAlpha: true, default: "rgba(161, 161, 170, 1)" }
+              - { label: "Text Faint", name: textFaint, widget: color, enableAlpha: true, default: "rgba(113, 113, 122, 1)" }
+              - { label: "Primary (links, buttons)", name: primary, widget: color, enableAlpha: true, default: "rgba(59, 130, 246, 1)" }
+              - { label: "Primary Hover", name: primaryHover, widget: color, enableAlpha: true, default: "rgba(96, 165, 250, 1)" }
+              - { label: "Accent", name: accent, widget: color, enableAlpha: true, default: "rgba(139, 92, 246, 1)" }
+              - { label: "Border", name: border, widget: color, enableAlpha: true, default: "rgba(39, 39, 42, 1)" }
+              - { label: "Input Background", name: inputBg, widget: color, enableAlpha: true, default: "rgba(39, 39, 42, 1)" }
+              - { label: "Input Border", name: inputBorder, widget: color, enableAlpha: true, default: "rgba(63, 63, 70, 1)" }
+              - { label: "Tag Background", name: tag, widget: color, enableAlpha: true, default: "rgba(39, 39, 42, 1)" }
+              - { label: "Tag Text", name: tagText, widget: color, enableAlpha: true, default: "rgba(161, 161, 170, 1)" }
+              - { label: "Card Background", name: cardBg, widget: color, enableAlpha: true, default: "rgba(24, 24, 27, 1)" }
+              - { label: "Card Border", name: cardBorder, widget: color, enableAlpha: true, default: "rgba(39, 39, 42, 1)" }
+              - { label: "Card Hover Border", name: cardHover, widget: color, enableAlpha: true, default: "rgba(63, 63, 70, 1)" }
+              - { label: "Header Background", name: headerBg, widget: color, enableAlpha: true, default: "rgba(9, 9, 11, 1)" }
+              - { label: "Footer Background", name: footerBg, widget: color, enableAlpha: true, default: "rgba(9, 9, 11, 1)" }
+
+      - label: "Menus, Labels & Text"
+        name: labels
+        file: src/content/labels.json
+        fields:
+          - label: "Navigation Menu"
+            name: navItems
+            widget: list
+            hint: "Drag to reorder. Toggle visibility to show/hide without deleting."
+            fields:
+              - { label: "Label", name: label, widget: string }
+              - { label: "URL", name: url, widget: string, hint: "Path like /posts or full URL like https://example.com" }
+              - { label: "Visible", name: visible, widget: boolean, default: true }
+          - label: "Show Sign In Button"
+            name: showSignIn
+            widget: boolean
+            default: true
+            hint: "Show or hide the Sign In button in the header"
+          - label: "Navigation Labels"
+            name: nav
+            widget: object
+            collapsed: false
+            fields:
+              - { label: "Posts Link", name: posts, widget: string, default: "Posts" }
+              - { label: "Galleries Link", name: galleries, widget: string, default: "Galleries" }
+              - { label: "Social Link", name: social, widget: string, default: "Social" }
+              - { label: "Settings Link", name: settings, widget: string, default: "Settings" }
+              - { label: "About Link", name: about, widget: string, default: "About" }
+              - { label: "Sign In Button", name: signIn, widget: string, default: "Sign In" }
+              - { label: "RSS Link", name: rss, widget: string, default: "RSS" }
+          - label: Home Page
+            name: home
+            widget: object
+            collapsed: true
+            fields:
+              - { label: "Recent Heading", name: recentPhotos, widget: string, default: "Recent" }
+              - { label: "View All Posts Link", name: viewAllPosts, widget: string, default: "View all posts →" }
+          - label: Social Page
+            name: social
+            widget: object
+            collapsed: true
+            fields:
+              - { label: "Page Heading", name: heading, widget: string, default: "Social Feed" }
+              - { label: "Squads Tab", name: tabSquads, widget: string, default: "Squads" }
+              - { label: "Timeline Tab", name: tabTimeline, widget: string, default: "Timeline" }
+              - { label: "Discover Tab", name: tabDiscover, widget: string, default: "Discover" }
+              - { label: "Sign In Prompt", name: signInPrompt, widget: string, default: "Sign in to see your timeline" }
+              - { label: "Sign In Button", name: signInButton, widget: string, default: "Sign in with GitHub" }
+              - { label: "Loading Text", name: loading, widget: string, default: "Loading..." }
+              - { label: "No Posts Message", name: noPosts, widget: string, default: "No posts yet" }
+              - { label: "No Users Message", name: noUsers, widget: string, default: "No users yet" }
+              - { label: "Load Error", name: failedToLoad, widget: string, default: "Failed to load feed" }
+              - { label: "Share Button", name: shareButton, widget: string, default: "↗ Share" }
+              - { label: "Read Link", name: readButton, widget: string, default: "↗ Read" }
+              - { label: "View Link", name: viewButton, widget: string, default: "↗ View" }
+              - { label: "Connect Bluesky Prompt", name: connectBluesky, widget: string, default: "Connect your Bluesky account in Settings to see your feed" }
+          - label: Posts Page
+            name: posts
+            widget: object
+            collapsed: true
+            fields:
+              - { label: "Page Heading", name: heading, widget: string, default: "All Posts" }
+          - label: Galleries Page
+            name: galleries
+            widget: object
+            collapsed: true
+            fields:
+              - { label: "Page Heading", name: heading, widget: string, default: "Photo Galleries" }
+              - { label: "All Photos Heading", name: allPhotos, widget: string, default: "All Photos" }
+              - { label: "Gallery Label", name: gallery, widget: string, default: "Gallery" }
+          - label: About Page
+            name: about
+            widget: object
+            collapsed: true
+            fields:
+              - { label: "Page Heading", name: heading, widget: string, default: "About This Site" }
+          - label: Settings Pages
+            name: settings
+            widget: object
+            collapsed: true
+            fields:
+              - { label: "Page Heading", name: heading, widget: string, default: "Settings" }
+              - { label: "RSS Feeds Card", name: rssFeeds, widget: string, default: "RSS Feeds" }
+              - { label: "Bluesky Card", name: bluesky, widget: string, default: "Bluesky" }
+              - { label: "Sign In Prompt", name: signInPrompt, widget: string, default: "Sign in to manage your settings" }
+              - { label: "Sign In Button", name: signInButton, widget: string, default: "Sign in with GitHub" }
+          - label: RSS Feeds Settings
+            name: feeds
+            widget: object
+            collapsed: true
+            fields:
+              - { label: "Page Heading", name: heading, widget: string, default: "External RSS Feeds" }
+              - { label: "Add Feed Button", name: addFeed, widget: string, default: "Add Feed" }
+              - { label: "My Feeds Tab", name: tabMyFeeds, widget: string, default: "My Feeds" }
+              - { label: "All Posts Tab", name: tabAllPosts, widget: string, default: "All Posts" }
+              - { label: "Back Link", name: backToFeeds, widget: string, default: "← Back to feeds" }
+              - { label: "No Feeds Message", name: noFeeds, widget: string, default: "No feeds yet. Add one above!" }
+              - { label: "Load More Button", name: loadMore, widget: string, default: "Load More" }
+              - { label: "Adding Text", name: adding, widget: string, default: "Adding..." }
+          - label: Bluesky Settings
+            name: bluesky
+            widget: object
+            collapsed: true
+            fields:
+              - { label: "Page Heading", name: heading, widget: string, default: "Bluesky Integration" }
+              - { label: "Connection Status", name: connectionStatus, widget: string, default: "Connection Status" }
+              - { label: "Connect Heading", name: connectHeading, widget: string, default: "Connect Bluesky" }
+              - { label: "Handle Label", name: handleLabel, widget: string, default: "Bluesky Handle" }
+              - { label: "Password Label", name: passwordLabel, widget: string, default: "App Password" }
+              - { label: "Connect Button", name: connectButton, widget: string, default: "Connect Bluesky Account" }
+              - { label: "Active Badge", name: active, widget: string, default: "Active" }
+              - { label: "Paused Badge", name: paused, widget: string, default: "Paused" }
+              - { label: "Not Connected Badge", name: notConnected, widget: string, default: "Not Connected" }
+              - { label: "No Account Message", name: noAccount, widget: string, default: "No Bluesky account connected." }
+              - { label: "Pause Cross-posting", name: pauseCrosspost, widget: string, default: "Pause Cross-posting" }
+              - { label: "Enable Cross-posting", name: enableCrosspost, widget: string, default: "Enable Cross-posting" }
+          - label: Squads Settings
+            name: squads
+            widget: object
+            collapsed: true
+            fields:
+              - { label: "Page Heading", name: heading, widget: string, default: "Squads" }
+              - { label: "Sign In Prompt", name: signInPrompt, widget: string, default: "Sign in and connect Bluesky to use Squads" }
+              - { label: "Name Placeholder", name: placeholder, widget: string, default: "Squad name (e.g. Photo Friends)" }
+              - { label: "Create Button", name: createButton, widget: string, default: "Create Squad" }
+              - { label: "Delete Button", name: deleteButton, widget: string, default: "Delete" }
+              - { label: "View Feed Button", name: viewFeed, widget: string, default: "View Squad Feed" }
+              - { label: "Hide Feed Button", name: hideFeed, widget: string, default: "Hide Squad Feed" }
+              - { label: "No Posts Message", name: noPosts, widget: string, default: "No posts" }
+          - label: Components
+            name: components
+            widget: object
+            collapsed: true
+            fields:
+              - { label: "Comments Label", name: comments, widget: string, default: "Comments" }
+              - { label: "Share Button", name: share, widget: string, default: "↗ Share" }
+              - { label: "View on Bluesky Link", name: viewOnBluesky, widget: string, default: "View on Bluesky ↗" }
+              - { label: "Comment Placeholder", name: commentPlaceholder, widget: string, default: "Write a comment..." }
+              - { label: "Post Button", name: postButton, widget: string, default: "Post" }
+              - { label: "EXIF Heading", name: exifData, widget: string, default: "EXIF Data" }
+              - { label: "Camera Label", name: camera, widget: string, default: "Camera" }
+              - { label: "Lens Label", name: lens, widget: string, default: "Lens" }
+              - { label: "Focal Length Label", name: focalLength, widget: string, default: "Focal Length" }
+              - { label: "Aperture Label", name: aperture, widget: string, default: "Aperture" }
+              - { label: "Shutter Speed Label", name: shutterSpeed, widget: string, default: "Shutter Speed" }
+              - { label: "ISO Label", name: iso, widget: string, default: "ISO" }
+              - { label: "Date Taken Label", name: dateTaken, widget: string, default: "Date Taken" }
+          - label: Player
+            name: player
+            widget: object
+            collapsed: true
+            fields:
+              - { label: "Audio Player Label", name: audioPlayer, widget: string, default: "♫ Audio Player" }
+              - { label: "Video Player Label", name: videoPlayer, widget: string, default: "▶ Player" }
+              - { label: "Play", name: play, widget: string, default: "Play" }
+              - { label: "Pause", name: pause, widget: string, default: "Pause" }
+              - { label: "Previous", name: previous, widget: string, default: "Previous" }
+              - { label: "Next", name: next, widget: string, default: "Next" }
+              - { label: "Playlist", name: playlist, widget: string, default: "Playlist" }
+              - { label: "Minimize", name: minimize, widget: string, default: "Minimize" }
+              - { label: "Expand Player", name: expand, widget: string, default: "Expand player" }
+              - { label: "Change Position", name: changePosition, widget: string, default: "Change position" }
+              - { label: "Track", name: track, widget: string, default: "Track" }
+              - { label: "YouTube Video", name: youtubeVideo, widget: string, default: "YouTube video" }
+          - label: Footer
+            name: footer
+            widget: object
+            collapsed: true
+            fields:
+              - { label: "Powered By Text", name: poweredBy, widget: string, default: "Powered by Pirate Social" }
