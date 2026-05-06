@@ -1,26 +1,26 @@
 {
-  "github": "madmonkey",
-  "camera": "",
-  "bio": "Developer, Husband/Father, Comedian, Musician and rotisserie chicken splurger and enthusiast. Enjoys long romantic walks to the liquor store...\n\nstop looking at my profile...it makes me feel dirty...",
+  "enableSocial": true,
+  "navStyle": "float",
   "showDates": true,
-  "mastodon": "",
+  "title": "ⓘ 𝕆ligarch f*ckery detected",
+  "description": "Integration hub for all the things",
   "author": "ⓘ 𝕆ligarch f*ckery detected",
+  "bio": "Developer, Husband/Father, Comedian, Musician and rotisserie chicken splurger and enthusiast. Enjoys long romantic walks to the liquor store...\n\nstop looking at my profile...it makes me feel dirty...",
+  "avatar": "/images/avatar.jpg",
+  "location": "",
+  "camera": "",
   "logo": {
     "type": "text",
     "image": "",
     "text": ""
   },
-  "enableSocial": true,
-  "navStyle": "float",
-  "instagram": "",
-  "location": "",
-  "title": "ⓘ 𝕆ligarch f*ckery detected",
-  "avatar": "/images/avatar.jpg",
-  "description": "A photography site on the Pirate Social network",
   "cloudinary": {
     "enabled": false,
     "cloudName": "",
     "apiKey": ""
   },
-  "giphyKey": ""
+  "giphyKey": "",
+  "instagram": "",
+  "github": "madmonkey",
+  "mastodon": ""
 }
